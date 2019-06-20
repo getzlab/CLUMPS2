@@ -1,7 +1,5 @@
 # getzlab-CLUMPS2
 
----
-
 Re-factored code for CLUMPS written in Python3.
 
 TODO:
