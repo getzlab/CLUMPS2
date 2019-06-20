@@ -9,3 +9,5 @@ TODO:
 - [ ] Re-wite post-processing
 - [ ] Example data/test cases
 - [ ] Support for slurm for `clumps.py` via `canine`
+- [ ] Update `genomeProteomeMaps.txt` files with recent PDB database
+- [ ] Add convenient download for reference files
