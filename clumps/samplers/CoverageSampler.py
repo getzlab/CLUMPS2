@@ -1,20 +1,21 @@
 import jpype
 import scipy as sp
+import contextlib
 
-jpype.startJVM(jpype.getDefaultJVMPath(), '-ea', '-Djava.class.path=FixedWidthBinary.jar')
-FixedWidthBinary = jpype.JPackage('org').broadinstitute.cga.tools.seq.FixedWidthBinary
+#jpype.startJVM(jpype.getDefaultJVMPath(), '-ea', '-Djava.class.path=/home/sanand/getzlab-CLUMPS2/clumps/samplers/FixedWidthBinary.jar')
+#FixedWidthBinary = jpype.JPackage('org').broadinstitute.cga.tools.seq.FixedWidthBinary
 
 class CoverageSampler(object):
+
+    FixedWidthBinary = None
+
     def __init__(self, availUPresid, upid, covtrack, gpm):
         self.availUPresid = availUPresid
         self.availUPresidIdx = range(len(self.availUPresid))
         self.upid = upid
         self.gpm = gpm
-        self.fwb = FixedWidthBinary(covtrack)
+        self.fwb = CoverageSampler.FixedWidthBinary(covtrack)
         self.covprobs = self.calcProbabilities()  ## array of probabilities (derived from coverage) for each position
-
-    def __del__(self):
-        jpype.shutdownJVM()
 
     def calcProbabilities(self):
         resid2coverage = {}
@@ -32,7 +33,7 @@ class CoverageSampler(object):
 
             for ei in range(len(self.gpm.gen2prot[chr][gi][2])):  ## for each exon
                 for pos in range(self.gpm.gen2prot[chr][gi][2][ei][0], self.gpm.gen2prot[chr][gi][2][ei][1]):
-                    res = self.gpm.mapGPchange(chr[3:], pos+1, gi, ei, None)
+                    res = self.gpm.map_gen2prot(chr[3:], pos+1, gi, ei, None)
                     for r in res:
                         if r[0] != self.upid:
                             continue
@@ -59,3 +60,16 @@ class CoverageSampler(object):
 
     def sample(self, mi):
         return (sorted(sp.random.choice(self.availUPresidIdx, len(mi), p=self.covprobs, replace=False)), sp.random.permutation(len(mi)))
+
+    @classmethod
+    @contextlib.contextmanager
+    def start_jvm(cls):
+        """
+        Start Java VM.
+        """
+        try:
+            jpype.startJVM(jpype.getDefaultJVMPath(), '-ea', '-Djava.class.path=/home/sanand/getzlab-CLUMPS2/clumps/samplers/FixedWidthBinary.jar')
+            cls.FixedWidthBinary = jpype.JPackage('org').broadinstitute.cga.tools.seq.FixedWidthBinary
+            yield
+        finally:
+            jpype.shutdownJVM()

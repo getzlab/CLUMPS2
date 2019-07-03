@@ -19,7 +19,6 @@ def makedir(dirname):
     except FileExistsError:
         print("{} already exists.".format(dirname))
 
-
 def main():
     parser = argparse.ArgumentParser(description='Prepare inputs for CLUMPS.')
     parser.add_argument('-i','--input', required=True, type=str, help='<Required> Input file for CLUMPS. Default is to expect an input .maf file, but a processed acetylomics file, already in protein coordinates, is allowed using -a option.')
@@ -66,7 +65,7 @@ def main():
         # Rename for formatting
         freq_df = freq_df.reset_index().rename(columns={'patient':'SAMPLE','raw':'MUT_COUNT', 'rank_score':'TTYPE_RANK_SCORE','zlog':'ZLOG_SCORE'})
         freq_df['TTYPE'] = args.ttype
-        freq_df.loc[:,['TTYPE','SAMPLE','MUT_COUNT','TTYPE_RANK_SCORE','ZLOG_SCORE']].to_csv(os.path.join(args.output_dir,'mut_spectra.txt'), sep='\t',index=None)
+        freq_df.loc[:,['TTYPE','SAMPLE','MUT_COUNT','TTYPE_RANK_SCORE','ZLOG_SCORE']].to_csv(os.path.join(args.output_dir,'mut_freq.txt'), sep='\t',index=None)
 
         # Make muts file in CLUMPS Format
         muts_df = input_df[input_df['value'] == 1].loc[:,['patient','uniprot_id','site_position','geneSymbol', 'variableSites']]

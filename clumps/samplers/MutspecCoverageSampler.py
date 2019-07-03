@@ -17,18 +17,14 @@ class MutspecCoverageSampler(CoverageSampler):
 
         ## extract mutation spectra from file
         self.patcounts = {}
-        self.conefindex = {}  ## index of context-effects
-
-        fi = file(mutSpectraFn)
-        conef = fi.readline().strip().split('\t')[2:]
-        for i in xrange(len(conef)):
-            self.conefindex[tuple(conef[i].split('-'))] = i
-        while 1:
-            l = fi.readline()
-            if not l:
-                break
-            l = l.strip().split('\t')
-            self.patcounts[tuple(l[:2])] = map(int, l[2:])
+        with open(mutSpectraFn, 'r') as f:
+            for idx,line in enumerate(f):
+                if idx == 0:
+                    conef = line.strip().split('\t')[2:]
+                    self.conefindex = {tuple(conef[i].split('-')):i for i in range(len(conef))}
+                else:
+                    _l = line.strip().split('\t')
+                    self.patcounts[tuple(_l[:2])] = [int(x) for x in _l[2:]]
 
         ## codon table
         self.codonTable = {i.lower():standard_dna_table.forward_table[i] for i in standard_dna_table.forward_table}
@@ -88,7 +84,7 @@ class MutspecCoverageSampler(CoverageSampler):
             if origaa != self.gpm.sp[upid][ip-1]:
                 print(origaa, self.gpm.sp[upid][ip-1], ip-1, gposs)
                 raise Exception('Translation does not match the reference!')
-            for i in xrange(3):  ## codon position
+            for i in range(3):  ## codon position
                 ## test which change will create a missense mutation
                 for j in ['a','c','g','t']:
                     if origcodon[i] == j:
@@ -108,7 +104,9 @@ class MutspecCoverageSampler(CoverageSampler):
 
 
     def calcMutSpecProbs(self, md):
-        """ calculate probabilities per uniprot position """
+        """
+        Calculate probabilities per uniprot position.
+        """
         patprobs = {}
         for pos in md:
             for pat in md[pos][2]:
@@ -141,20 +139,19 @@ class MutspecCoverageSampler(CoverageSampler):
             else:
                 ## prob product
                 #p = [1]*len(self.availUPresid)
-                #for i in xrange(len(self.availUPresid)):
+                #for i in range(len(self.availUPresid)):
                 #    for j in md[pos][2]:
                 #        p[i] *= patprobs[j][i]
 
-                p = [[] for i in xrange(len(self.availUPresid))]
-                for i in xrange(len(self.availUPresid)):
+                p = [[] for i in range(len(self.availUPresid))]
+                for i in range(len(self.availUPresid)):
                     for j in md[pos][2]:
                         p[i].append(patprobs[j][i])
                 p = map(lambda x:len(x) and sp.median(x) or 0, p)
             ## multiply by coverage vector
-            p = [p[i]*self.covprobs[i] for i in xrange(len(self.availUPresid))]
+            p = [p[i]*self.covprobs[i] for i in range(len(self.availUPresid))]
             p = [i/sum(p) for i in p]
             self.mutspecprobs[pos] = p
-
 
     def presample(self, mireal):  ## mi are indices
         self.presamples = []
@@ -163,7 +160,6 @@ class MutspecCoverageSampler(CoverageSampler):
             m = self.availUPresid[i]
             r = sp.random.choice(self.availUPresidIdx, 1000, p=self.mutspecprobs[m])
             self.presamples.append(r)
-
 
     def sample(self, mireal):
         if self.presampleindex == 1000:
@@ -180,6 +176,6 @@ class MutspecCoverageSampler(CoverageSampler):
                     return
             ret[n] = m
         self.presampleindex += 1
-        ret = ret.items()
+        ret = list(ret.items())
         ret.sort()
         return ([i[0] for i in ret], [i[1] for i in ret])
