@@ -233,29 +233,28 @@ def make_gp_file(gpm, input_maf, output_file='muts.gp'):
             mfile.write('\t'.join(['patient', 'ttype', 'chr', 'pos', 'refbase', 'newbase', 'uniprot_change']) + '\n')
             COUNTER = 0
 
-            for idx,line in enumerate(f):
-                if idx > 0:
-                    maf_line = line.strip('\n').split('\t')
+            for line in f:
+                maf_line = line.strip('\n').split('\t')
 
-                    if len(maf_line[iTumAllele2]) > 1 or maf_line[iTumAllele2] == '-':
-                        continue
-                    if len(maf_line[iRefAllele]) > 1 or maf_line[iRefAllele] == '-':
-                        continue
+                if len(maf_line[iTumAllele2]) > 1 or maf_line[iTumAllele2] == '-':
+                    continue
+                if len(maf_line[iRefAllele]) > 1 or maf_line[iRefAllele] == '-':
+                    continue
 
-                    # newly mutated base
-                    newbase = maf_line[iTumAllele2]
+                # newly mutated base
+                newbase = maf_line[iTumAllele2]
 
-                    # protien:AA-site-newAA
-                    protein_aa_change = gpm.map_gen2prot(maf_line[iChr], int(maf_line[iPos]), None, None, newbase)
-                    if not protein_aa_change:
-                        continue
+                # protien:AA-site-newAA
+                protein_aa_change = gpm.map_gen2prot(maf_line[iChr], int(maf_line[iPos]), None, None, newbase)
+                if not protein_aa_change:
+                    continue
 
-                    protein_aa_change = '; '.join(map(lambda x:'%s:%s%d%s' % (x[0], x[2], x[1], x[3]), protein_aa_change))
+                protein_aa_change = '; '.join(map(lambda x:'%s:%s%d%s' % (x[0], x[2], x[1], x[3]), protein_aa_change))
 
-                    # Join all
-                    nl = [maf_line[iPatient], maf_line[iTtype], maf_line[iChr], maf_line[iPos], maf_line[iRefAllele], newbase, protein_aa_change]
+                # Join all
+                nl = [maf_line[iPatient], maf_line[iTtype], maf_line[iChr], maf_line[iPos], maf_line[iRefAllele], newbase, protein_aa_change]
 
-                    mfile.write('\t'.join(nl) + '\n')
+                mfile.write('\t'.join(nl) + '\n')
         print(COUNTER)
 
 def split_muts_file(input_gp, split_protein_dir='splitByProtein', mut_types=set(['M'])):
@@ -276,36 +275,35 @@ def split_muts_file(input_gp, split_protein_dir='splitByProtein', mut_types=set(
         iPatient = hdr.index('patient')
         iTtype = hdr.index('ttype')
 
-        for idx,line in enumerate(f):
-            if idx > 0:
-                line = line.strip('\n').split('\t')
+        for line in f:
+            line = line.strip('\n').split('\t')
 
-                if not line[iUniprotChange]:
+            if not line[iUniprotChange]:
+                continue
+
+            # List all Protein Mutations
+            # Determines the mutatation type
+            for um in line[iUniprotChange].split('; '):
+                u,m = um.split(':')
+                if m[-1] == '*':
+                    mt = 'N'
+                elif m[-1] == m[0]:
+                    mt = 'S'
+                else:
+                    mt = 'M'
+
+                # Only consider mutations in the mut_types set
+                if mt not in mut_types:
                     continue
 
-                # List all Protein Mutations
-                # Determines the mutatation type
-                for um in line[iUniprotChange].split('; '):
-                    u,m = um.split(':')
-                    if m[-1] == '*':
-                        mt = 'N'
-                    elif m[-1] == m[0]:
-                        mt = 'S'
-                    else:
-                        mt = 'M'
+                aa_mutation_index = m[1:-1]
+                while not aa_mutation_index[-1].isdigit():
+                    # Some mutations are annotated as SNPs although they are not
+                    aa_mutation_index = aa_mutation_index[:-1]
 
-                    # Only consider mutations in the mut_types set
-                    if mt not in mut_types:
-                        continue
-
-                    aa_mutation_index = m[1:-1]
-                    while not aa_mutation_index[-1].isdigit():
-                        # Some mutations are annotated as SNPs although they are not
-                        aa_mutation_index = aa_mutation_index[:-1]
-
-                    # Join data
-                    dline = '\t'.join([line[iTtype], line[iPatient], 'na', u, 'p.' + m, aa_mutation_index, mt])
-                    pdata[u].append(dline)
+                # Join data
+                dline = '\t'.join([line[iTtype], line[iPatient], 'na', u, 'p.' + m, aa_mutation_index, mt])
+                pdata[u].append(dline)
 
         try:
             os.mkdir(split_protein_dir)

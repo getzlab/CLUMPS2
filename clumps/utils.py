@@ -16,8 +16,6 @@ import contextlib
 import tempfile
 import subprocess
 
-PDB_STRUCTURES = './dat/pdbs/ftp.wwpdb.org/pub/pdb/data/structures/divided/pdb'
-
 aamap = {'ALA':'A','ARG':'R','ASN':'N','ASP':'D','CYS':'C','GLN':'Q','GLU':'E', \
          'GLY':'G','HIS':'H','ILE':'I','LEU':'L','LYS':'K','MET':'M','PHE':'F',\
          'PRO':'P','SER':'S','THR':'T','TRP':'W','TYR':'Y','VAL':'V','PYX':'C',\
@@ -56,7 +54,7 @@ def gunzipper(gz_file):
         subprocess.check_call("gzip -dc {} >> {}".format(gz_file, temp_file.name), executable='/bin/bash', shell=True)
         yield temp_file
 
-def get_distance_matrix(pdbch, point='centroid', pdb_resids=None, return_centroid_coordinates=False):
+def get_distance_matrix(pdbch, pdb_structures_dir, point='centroid', pdb_resids=None, return_centroid_coordinates=False):
     """
     Returns a distance matrix summarizing the Euclidean distances
     between residues in structure pdbch.
@@ -64,7 +62,7 @@ def get_distance_matrix(pdbch, point='centroid', pdb_resids=None, return_centroi
     if return_centroid_coordinates and point != 'centroid':
         raise Exception('return_centroid_coordinates is True but point argument is not set to centroid')
 
-    pdb_file = '%s/%s/pdb%s.ent.gz' % (PDB_STRUCTURES, pdbch[0][1:3], pdbch[0])
+    pdb_file = '%s/%s/pdb%s.ent.gz' % (pdb_structures_dir, pdbch[0][1:3], pdbch[0])
 
     # Open PDB File Using Prody
     with gunzipper(pdb_file) as pfile:
@@ -174,7 +172,6 @@ def load_prot_file(protein_dir, uniprot):
     else:
         with open(os.path.join(protein_dir, uniprot)) as f:
             gm = f.read()
-
     return gm
 
 

@@ -7,6 +7,11 @@ import os
 import contextlib
 from mapper import GPmapper
 
+from canine import Orchestrator
+from canine.utils import ArgumentHelper
+import subprocess
+from glob import glob
+
 from multiprocessing import Process, Queue
 from samplers.UniformSampler import *
 from samplers.CoverageSampler import *
@@ -22,19 +27,64 @@ def main():
     parser.add_argument('-f', '--mut_freq', required=True, help='<Required> Mutational frequenices of patient samples.')
     parser.add_argument('--max_rand', default=10000000, required=False, type=int, help='Maximum number of random samples.')
     parser.add_argument('--mut_types', required=False, default=['M'], nargs='+', type=str, help='Mutation Types (N = nonsense, S = synonymous, M = mutation)')
-    parser.add_argument('-u','--sampler', required=False, default='UniformSampler', help='Sampler to use for Null Model.', choices=('UniformSampler','CoverageSampler','MutspecCoverageSampler'))
-    parser.add_argument('-s', '--mut_spectra', required=False, help='Mutational spectra of patient samples.')
+    parser.add_argument('--sampler', required=False, default='UniformSampler', help='Sampler to use for Null Model.', choices=('UniformSampler','CoverageSampler','MutspecCoverageSampler'))
+    parser.add_argument('--mut_spectra', required=False, help='Mutational spectra of patient samples.')
     parser.add_argument('-e','--hill_exp', required=False, default=4, type=int, help='Hill Exponent')
     parser.add_argument('-p','--pancan_factor', required=False, default=1.0, type=float, help='Pan Cancer factor, value between 0 - 1. 1.0 if tumor type specified.')
     parser.add_argument('-t','--tumor_type', required=False, default='PanCan', type=str, help='Tumor type.')
     parser.add_argument('--xpo', required=False, default=[3, 4.5, 6, 8, 10], type=list, help='Soft threshold parameter for truncated Gaussian.')
-    parser.add_argument('--cores', required=False, type=int, default=1, help='Number of cores.')
+    #parser.add_argument('--cores', required=False, type=int, default=1, help='Number of cores.')
     parser.add_argument('--threads', required=False, type=int, default=1, help='Number of threads for sampling.')
+    parser.add_argument('--n_jobs', type=int, default=1, help='Number of jobs to use.')
     parser.add_argument('--use_provided_values', required=False, default=0, type=int)
     parser.add_argument('--coverage_track', required=False, default=None, type=str, help='Coverage track for null sampler.')
     parser.add_argument('-o', '--out_dir', required=False, default='./res/', type=str, help='Output directory.')
-
+    parser.add_argument('--pdb_dir', required=False, default='./dat/pdbs/ftp.wwpdb.org/pub/pdb/data/structures/divided/pdb', help='PDB directory.')
+    parser.add_argument('--slurm', default=False, action='store_true', help='Use SLURM backend.')
     args = parser.parse_args()
+
+    ####################################################
+    if args.slurm:
+        # TODO: finish dockerizing
+        # TODO: test this
+
+        pipeline = {
+            'name': 'wumps',
+            'script': ["sudo docker run --rm -v $CANINE_ROOT:$CANINE_ROOT gcr.io/broad-cga-sanand-gtex/clumps python clumps.py "],
+            'inputs': {},
+            'resources': {
+                'cpus-per-task': 1,
+                'mem-per-cpu': 900,
+            },
+            'backend': {
+                'type': 'TransientGCP',
+                'name': 'slorb-clumps',
+                'compute_zone': 'us-east1-b',
+                'controller_type': 'n1-standard-4',
+                'worker_type': 'n1-highcpu-4'
+            },
+            'outputs': {
+                'clumps_output': args.out_dir+"/*"
+            }
+
+        }
+
+        for key,value in vars(args).items():
+            if key == 'maps':
+                # Array values
+                map_length = int(subprocess.run("zcat {} | wc -l".format(value), shell=True, executable='bin/bash', stdout=subprocess.PIPE).stdout.decode())
+                chonk_size = map_length / args.n_jobs
+
+                subprocess.check_call("zcat {} | split -d -l {} - huniprot_split_maps_ && gzip huniprot_split_maps_*".format(args.maps, chonk_size))
+                pipeline['inputs']['maps'] = glob("huniprot_split_maps_*")
+
+            elif key is not 'slurm':
+                pipeline['inputs'][key] = value
+
+            pipeline['script'][0] += "--{0} ${0} ".format(key)
+
+        batch_id, jobs, outputs, sacct = Orchestrator(pipeline).run_pipeline()
+    ####################################################
 
     if args.tumor_type == 'PanCan':
         args.tumor_type = None
@@ -84,7 +134,7 @@ def main():
                     if len(mi) > 0:
                         # Get AA residue Coordinates
                         try:
-                            D,x = get_distance_matrix(pdbch, pdb_resids=pr)
+                            D,x = get_distance_matrix(pdbch, args.pdb_dir, pdb_resids=pr)
                         except:
                             print("Unable to load PDB...")
                             continue

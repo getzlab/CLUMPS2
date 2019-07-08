@@ -62,57 +62,54 @@ def calc_muts_spectra(input_maf, hgfile='./dat/hg19.2bit', out_file='sampleMutSp
     sample_muts_context = defaultdict(lambda: [0]*96)
 
     with open(input_maf, 'r') as f:
-        hdr = f.readline()
+        hdr = f.readline().strip().split('\t')
 
-    hdr = hdr.strip().split('\t')
-    iPat = hdr.index('Tumor_Sample_Barcode')
-    iClass = hdr.index('Variant_Type')
-    iChr = hdr.index('Chromosome')
-    iPos = hdr.index('Start_position')
-    iRefA = hdr.index('Reference_Allele')
-    iNewbase = hdr.index('Tumor_Seq_Allele2')
-    iTtype = hdr.index('ttype')
+        iPat = hdr.index('Tumor_Sample_Barcode')
+        iClass = hdr.index('Variant_Type')
+        iChr = hdr.index('Chromosome')
+        iPos = hdr.index('Start_position')
+        iRefA = hdr.index('Reference_Allele')
+        iNewbase = hdr.index('Tumor_Seq_Allele2')
+        iTtype = hdr.index('ttype')
 
-    with open(input_maf, 'r') as f:
-        for i,line in enumerate(f):
-            if i > 0:
-                line = line.strip('\n').split('\t')
+        for line in f:
+            line = line.strip('\n').split('\t')
 
-                # Skip if not a SNP
-                if line[iClass] != 'SNP':
-                    continue
+            # Skip if not a SNP
+            if line[iClass] != 'SNP':
+                continue
 
-                reference_base = line[iRefA].lower()
-                new_base = line[iNewbase]
+            reference_base = line[iRefA].lower()
+            new_base = line[iNewbase]
 
-                if len(reference_base) != 1 or reference_base == '-':
-                    continue
-                if len(new_base) != 1 or new_base == '-':
-                    continue
+            if len(reference_base) != 1 or reference_base == '-':
+                continue
+            if len(new_base) != 1 or new_base == '-':
+                continue
 
-                pos = int(line[iPos])
-                chromosome = line[iChr]
+            pos = int(line[iPos])
+            chromosome = line[iChr]
 
-                if chromosome == '23':
-                    chromosome = 'X'
-                elif chromosome == '24':
-                    chromosome = 'Y'
-                elif chromosome == 'MT':
-                    chromosome = 'M'
+            if chromosome == '23':
+                chromosome = 'X'
+            elif chromosome == '24':
+                chromosome = 'Y'
+            elif chromosome == 'MT':
+                chromosome = 'M'
 
-                abc = hg['chr'+chromosome][pos-2:pos+1].lower()
+            abc = hg['chr'+chromosome][pos-2:pos+1].lower()
 
-                if abc[1] != reference_base and reference_base != '--':
-                    print(abc, reference_base, line)
-                    print('non-matching reference.')
-                    continue
+            if abc[1] != reference_base and reference_base != '--':
+                print(abc, reference_base, line)
+                print('non-matching reference.')
+                continue
 
-                pat = (line[iPat], line[iTtype]) # l[iTtype].split('-')[0]
-                try:
-                    sample_muts_context[pat][encode(abc,line[iNewbase].lower())] += 1
-                except:
-                    ## because of Ns
-                    continue
+            pat = (line[iPat], line[iTtype]) # l[iTtype].split('-')[0]
+            try:
+                sample_muts_context[pat][encode(abc,line[iNewbase].lower())] += 1
+            except:
+                ## because of Ns
+                continue
 
     hdr = list(mutation_indices.items())
     hdr.sort(key=lambda x:x[1])
@@ -132,31 +129,27 @@ def calc_muts_freq(input_maf, out_file='sampleMutFreq.txt'):
     """
     print("SHOULD BE A MAF WITH ALL CODING MUTATIONS (NOT JUST MISSENSES)")
 
-    # Get Column Names
-    with open(input_maf, 'r') as f:
-        hdr = f.readline()
-
-    hdr = hdr.strip().split('\t')
-    iTumorSampleBarcode = hdr.index('Tumor_Sample_Barcode')
-    iVarClass = hdr.index('Variant_Classification')
-    iTtype = hdr.index('ttype')
-
     # Get coding mutations
     di = defaultdict(lambda: defaultdict(lambda: 0))
 
+    # Get Column Names
     with open(input_maf, 'r') as f:
-        for i,line in enumerate(f):
-            if i > 0:
-                line = line.strip('\n').split('\t')
+        hdr = f.readline().strip().split('\t')
+        iTumorSampleBarcode = hdr.index('Tumor_Sample_Barcode')
+        iVarClass = hdr.index('Variant_Classification')
+        iTtype = hdr.index('ttype')
 
-                if line[iVarClass] in coding_muts:
-                    pass
-                elif line[iVarClass] in noncoding_muts:
-                    continue
-                else:
-                    raise Exception('Mutation type {} unknown.'.format(line[iVarClass]))
+        for line in f:
+            line = line.strip('\n').split('\t')
 
-                di[line[iTtype]][line[iTumorSampleBarcode]] +=1
+            if line[iVarClass] in coding_muts:
+                pass
+            elif line[iVarClass] in noncoding_muts:
+                continue
+            else:
+                raise Exception('Mutation type {} unknown.'.format(line[iVarClass]))
+
+            di[line[iTtype]][line[iTumorSampleBarcode]] +=1
 
     with open(out_file, 'w') as f:
         f.write('TTYPE\tSAMPLE\tMUT_COUNT\tTTYPE_RANK_SCORE\tZLOG_SCORE\n')
