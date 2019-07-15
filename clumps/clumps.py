@@ -3,54 +3,175 @@ import time
 import argparse
 import gzip
 import os
-
 import contextlib
-from mapper import GPmapper
+import subprocess
+from glob import glob
+from multiprocessing import Process, Queue
+import pkg_resources
+import pandas as pd
+import numpy as np
 
 from canine import Orchestrator
 from canine.utils import ArgumentHelper
-import subprocess
-from glob import glob
 
-from multiprocessing import Process, Queue
-from samplers.UniformSampler import *
-from samplers.CoverageSampler import *
-from samplers.MutspecCoverageSampler import *
-
-from utils import hill, parse_resmap, load_mut_freqs, wap
-from utils import get_distance_matrix, transform_distance_matrix, get_pdb_muts_overlap, map_pos_with_weights
-
-
-def mkdir(path):
-    try:
-        os.makedirs(path)
-    except FileExistsError:
-        pass
+from .samplers.UniformSampler import *
+from .samplers.CoverageSampler import *
+from .samplers.MutspecCoverageSampler import *
+from .mapping.mapper import GPmapper
+from .utils import hill, parse_resmap, wap
+from .utils import get_distance_matrix, transform_distance_matrix, get_pdb_muts_overlap, map_pos_with_weights
+from .utils import mkdir
 
 def main():
     parser = argparse.ArgumentParser(description='Run CLUMPS.')
-    parser.add_argument('-d','--muts', required=True, type=str, help='<Required> Directory of files titled with Uniprot IDs that have mutation information')
-    parser.add_argument('-m','--maps', required=True, type=str, help='<Required> File mapping uniprot ID to PDB ID with residue-level mapping information.')
-    parser.add_argument('-f', '--mut_freq', required=True, help='<Required> Mutational frequenices of patient samples.')
-    parser.add_argument('--max_rand', default=10000000, required=False, type=int, help='Maximum number of random samples.')
-    parser.add_argument('--mut_types', required=False, default=['M'], nargs='+', type=str, help='Mutation Types (N = nonsense, S = synonymous, M = mutation)')
-    parser.add_argument('--sampler', required=False, default='UniformSampler', help='Sampler to use for Null Model.', choices=('UniformSampler','CoverageSampler','MutspecCoverageSampler'))
-    parser.add_argument('--mut_spectra', required=False, help='Mutational spectra of patient samples.')
-    parser.add_argument('-e','--hill_exp', required=False, default=4, type=int, help='Hill Exponent')
-    parser.add_argument('-p','--pancan_factor', required=False, default=1.0, type=float, help='Pan Cancer factor, value between 0 - 1. 1.0 if tumor type specified.')
-    parser.add_argument('-t','--tumor_type', required=False, default='PanCan', type=str, help='Tumor type.')
-    parser.add_argument('--xpo', required=False, default=[3, 4.5, 6, 8, 10], type=list, help='Soft threshold parameter for truncated Gaussian.')
-    #parser.add_argument('--cores', required=False, type=int, default=1, help='Number of cores.')
-    parser.add_argument('--threads', required=False, type=int, default=1, help='Number of threads for sampling.')
-    parser.add_argument('--n_jobs', type=int, default=1, help='Number of jobs to use.')
-    parser.add_argument('--use_provided_values', required=False, default=0, type=int)
-    parser.add_argument('--coverage_track', required=False, default=None, type=str, help='Coverage track for null sampler.')
-    parser.add_argument('-o', '--out_dir', required=False, default='./res/', type=str, help='Output directory.')
-    parser.add_argument('--pdb_dir', required=False, default='./dat/pdbs/ftp.wwpdb.org/pub/pdb/data/structures/divided/pdb', help='PDB directory.')
-    parser.add_argument('--slurm', default=False, action='store_true', help='Use SLURM backend.')
+    parser.add_argument(
+        '-d','--muts',
+        required=True,
+        type=str,
+        help='<Required> Directory of files titled with Uniprot IDs that have mutation information'
+    )
+    parser.add_argument(
+        '-m','--maps',
+        required=True,
+        type=str,
+        help='<Required> File mapping uniprot ID to PDB ID with residue-level mapping information.'
+    )
+    parser.add_argument(
+        '-f', '--mut_freq',
+        required=False,
+        help='Mutational frequenices of patient samples.',
+        default=None
+    )
+    parser.add_argument(
+        '--max_rand',
+        type=int,
+        default=10000000,
+        help='Maximum number of random samples.'
+    )
+    parser.add_argument(
+        '--mut_types',
+        default=['M'],
+        nargs='+',
+        help='Mutation Types (N = nonsense, S = synonymous, M = mutation)',
+    )
+    parser.add_argument(
+        '--sampler',
+        default='UniformSampler',
+        help='Sampler to use for Null Model.',
+        choices=('UniformSampler','CoverageSampler','MutspecCoverageSampler')
+    )
+    parser.add_argument(
+        '--mut_spectra',
+        required=False,
+        help='Mutational spectra of patient samples.',
+        default=None
+    )
+    parser.add_argument(
+        '-e','--hill_exp',
+        default=4,
+        type=int,
+        help='Hill Exponent'
+    )
+    parser.add_argument(
+        '-p','--pancan_factor',
+        default=1.0,
+        type=float,
+        help='Pan Cancer factor, value between 0 - 1. 1.0 if tumor type specified.'
+    )
+    parser.add_argument(
+        '-t','--tumor_type',
+        required=False,
+        default='PanCan',
+        type=str,
+        help='Tumor type to run clumps on. PanCan indicates running clumps over all \
+              tumor types found in input .maf.'
+    )
+    parser.add_argument(
+        '-x', '--xpo',
+        default=[3, 4.5, 6, 8, 10],
+        type=list,
+        help='Soft threshold parameter for truncated Gaussian.'
+    )
+    parser.add_argument(
+        '--threads',
+        type=int,
+        default=1,
+        help='Number of threads for sampling.'
+    )
+    parser.add_argument(
+        '--n_jobs',
+        type=int,
+        default=1,
+        help='Number of jobs to use.'
+    )
+    parser.add_argument(
+        '--use_provided_values',
+        required=False,
+        default=None,
+        type=int,
+        help="Compute mutational frequencies with provided values."
+    )
+    parser.add_argument(
+        '--coverage_track',
+        required=False,
+        default=None,
+        type=str,
+        help='Coverage track for null sampler.'
+    )
+    parser.add_argument(
+        '-o', '--out_dir',
+        required=False,
+        default='./results',
+        type=str,
+        help='Output directory.'
+    )
+    parser.add_argument(
+        '--pdb_dir',
+        default=pkg_resources.resource_filename('clumps', './dat/pdbs/ftp.wwpdb.org/pub/pdb/data/structures/divided/pdb'),
+        help='PDB directory.'
+    )
+    parser.add_argument(
+        '--hgfile', type=str,
+        default=os.path.join(pkg_resources.resource_filename('clumps', './dat'), 'hg19.2bit'),
+        help='2bit human genome build file.'
+    )
+    parser.add_argument(
+        '--fasta',
+        type=str,
+        default=os.path.join(pkg_resources.resource_filename('clumps', './dat'), 'UP000005640_9606.fasta.gz'),
+        help='Protein primary sequence fasta file.'
+    )
+    parser.add_argument(
+        '--gpmaps',
+        type=str,
+        default=os.path.join(pkg_resources.resource_filename('clumps', './dat'), 'genomeProteomeMaps.txt'),
+        help='Genome Proteome Maps built from blast hits.'
+    )
+    parser.add_argument(
+        '--slurm',
+        action='store_true',
+        help='Use SLURM backend.'
+    )
+
     args = parser.parse_args()
 
-    ####################################################
+    if args.tumor_type == 'PanCan':
+        args.tumor_type = None
+
+    if args.tumor_type and args.pancan_factor != 1.0:
+        print('WARNING: args.pancan_factor is not 1 althought args.tumor_type is set. Correcting to args.pancan_factor=1')
+        args.pancan_factor = 1.0
+
+    args.mut_types = set(args.mut_types)
+
+    if args.sampler == 'MutspecCoverageSampler':
+        assert args.mut_spectra is not None, "Provide mutational spectra data."
+    if args.sampler is not 'UniformSampler':
+        assert args.coverage_track is not None, "Provide coverage track for null model."
+
+    #----------------------------------------
+    # SLURM Bindings
+    #----------------------------------------
     if args.slurm:
         # TODO: finish dockerizing
         # TODO: test this
@@ -78,7 +199,6 @@ def main():
 
         for key,value in vars(args).items():
             if key == 'maps':
-                # Array values
                 map_length = int(subprocess.run("zcat {} | wc -l".format(value), shell=True, executable='bin/bash', stdout=subprocess.PIPE).stdout.decode())
                 chonk_size = map_length / args.n_jobs
 
@@ -91,24 +211,19 @@ def main():
             pipeline['script'][0] += "--{0} ${0} ".format(key)
 
         batch_id, jobs, outputs, sacct = Orchestrator(pipeline).run_pipeline()
-    ####################################################
 
-    if args.tumor_type == 'PanCan':
-        args.tumor_type = None
-
-    if args.tumor_type and args.pancan_factor != 1.0:
-        print('WARNING: args.pancan_factor is not 1 althought args.tumor_type is set. Correcting to args.pancan_factor=1')
-        args.pancan_factor = 1.0
-
-    args.mut_types = set(args.mut_types)
-    TIMED = True
-
+    #----------------------------------------
+    # CLUMPS
+    #----------------------------------------
     if args.sampler is not 'UniformSampler':
         print("Building mapper...")
-        gpm = GPmapper()
+        gpm = GPmapper(hgfile=args.hgfile, spfile=args.fasta, mapfile=args.gpmaps)
 
     mkdir(args.out_dir)
 
+    #----------------------------------------
+    # Run CLUMPS
+    #----------------------------------------
     with contextlib.ExitStack() as stack:
         if args.sampler is not "UniformSampler":
             stack.enter_context(CoverageSampler.start_jvm())
@@ -119,29 +234,30 @@ def main():
 
                 if os.path.isfile(os.path.join(args.muts, u1)):
                     pdbch = pdbch.split('-')
-
                     ur,pr,prd = parse_resmap(resmap)
 
                     if len(ur) < 5:
-                        ## number of mapped residues (between uniprot and pdb)
-                        #fo.write('#\n')
-                        #fo.close()
-                        print(ur)
+                        print("Bad mapping for {}.".format(ur))
                         continue
 
                     # Load mutational frequencies
-                    mfreq = load_mut_freqs(args.mut_freq)
+                    #mfreq = load_mut_freqs(args.mut_freq)
+                    if args.mut_freq is not None:
+                        mfreq = pd.read_csv(args.mut_freq, sep='\t').set_index(['TTYPE','SAMPLE']).loc[:,['ZLOG_SCORE']].to_dict()['ZLOG_SCORE']
+                    else:
+                        mfreq = {}
 
                     # Load Protein file
                     protein_muts = map_pos_with_weights(args.muts, u1, mfreq, args.tumor_type, args.mut_types, args.use_provided_values, args.mut_freq)
 
-                    # mi: index of mutated residue
-                    # mv: normalized mutation count at each residue
-                    # mt: cancer types contributing mutations
+                    # Load PDB data
+                    ## mi: index of mutated residue
+                    ## mv: normalized mutation count at each residue
+                    ## mt: cancer types contributing mutations
                     mi,mv,mt = get_pdb_muts_overlap(ur, protein_muts, args.hill_exp, args.use_provided_values)
 
+                    # Load AA residue coordinates
                     if len(mi) > 0:
-                        # Get AA residue Coordinates
                         try:
                             D,x = get_distance_matrix(pdbch, args.pdb_dir, pdb_resids=pr)
                         except:
@@ -153,24 +269,25 @@ def main():
 
                         print("Sampling {} | {} - {}".format(u1, pdbch, mi))
 
+                        # Compute matrix
                         ## matrix that holds mv[i]*mv[j] values (sqrt or not)
                         Mmv = []
                         mvcorr = range(len(mv))
 
                         for i in range(len(mi)):
-                            mrow = sp.zeros(len(mi), sp.float64)
+                            mrow = np.zeros(len(mi), np.float64)
                             for j in range(len(mi)):
-                                #mrow[j] = sp.sqrt(mv[i]*mv[j])  ## geometric mean; actually does not perform better in most cases
+                                #mrow[j] = np.sqrt(mv[i]*mv[j])  ## geometric mean; actually does not perform better in most cases
                                 if args.pancan_factor == 1.0:
                                     mrow[j] = mv[i]*mv[j]
                                 else:
                                     mrow[j] = (args.pancan_factor + (1.0-args.pancan_factor)*(len(mt[i] & mt[j])>0)) * mv[i]*mv[j]          ## product
                             Mmv.append(mrow)
 
-                        ## Compute WAP score
+                        # Compute WAP score
                         wap_obs = wap(mi, mvcorr, Mmv, DDt)
 
-                        ## Create Null Model
+                        # Create Null Model
                         rnd = 0
                         P = [0]*len(args.xpo)
                         WAP_RND = [0]*len(args.xpo)
@@ -184,8 +301,7 @@ def main():
                             sam = MutspecCoverageSampler(ur, u1, args.coverage_track, args.mut_spectra, gpm)
                             sam.calcMutSpecProbs(protein_muts)
 
-                        if TIMED:
-                            STARTTIME=time.time()
+                        STARTTIME=time.time()
 
                         def rndThread(qu):
                             def booster():
@@ -201,16 +317,17 @@ def main():
                                         break
                                 return ret
 
-                            sp.random.seed()
+                            np.random.seed()
                             p = [0]*len(args.xpo)
                             wap_rnd = [0]*len(args.xpo)
                             rnd = 0
 
                             exitstatus=0  ## 0 means terminated OK, 1 means it had to abort due to timeout
                             while rnd < args.max_rand/args.threads and (rnd%1000 or booster()):  ## booster is applied once per 1000 randomizations
-                                if not rnd%1000 and TIMED and (time.time()-STARTTIME)/60.0 > TIMED:
+                                if not rnd%1000 and (time.time()-STARTTIME)/60.0 > 1:
                                     exitstatus=1
                                     break
+
                                 x = None
 
                                 while x is None:
@@ -248,8 +365,7 @@ def main():
                                 P[i] += p[i]
                                 WAP_RND[i] += wap_rnd[i]
 
-                        SHARD = args.maps.rsplit('.',1)[0].rsplit('_',1)[1]
-                        with open(os.path.join(args.out_dir, '%s-%d_%s_%s_%s-%s_%s' % (SHARD, idx, u1, u2, pdbch[0], pdbch[1], resmap.split(':',1)[0])), 'a') as f:
+                        with open(os.path.join(args.out_dir, '%s-%d_%s_%s_%s-%s_%s' % (args.maps.rsplit('.',1)[0].rsplit('_',1)[1], idx, u1, u2, pdbch[0], pdbch[1], resmap.split(':',1)[0])), 'a') as f:
                             f.write('\t'.join(['%d/%d' % (P[i], totalrnd) for i in range(len(P))]) + '\n')
                             f.write('#%d\n' % totalexitstatus)
 

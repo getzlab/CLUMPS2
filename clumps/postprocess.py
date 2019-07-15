@@ -3,22 +3,47 @@ import sys
 import pandas as pd
 from collections import defaultdict
 from tqdm import tqdm
-
 from statsmodels.sandbox.stats.multicomp import multipletests
 import urllib.request as urllib2
 import argparse
 
-from utils import get_fragment_annot
+from .utils import get_fragment_annot
 
 def main():
     parser = argparse.ArgumentParser(description='Post-process CLUMPS.')
-
-    parser.add_argument('-i', '--input_dir', required=True, help='<Required> Results directory from CLUMPS.')
-    parser.add_argument('-d', '--proteins_dir', required=True, type=str, help='<Required> Split protein directory with mutation mapping information.')
-    parser.add_argument('-p', '--uniprot_map', required=False, default='./dat/huniprot/huniprot2pdb.run18.filt.txt', help='Aggregate file of all uniprot mappings to PDB IDs with residue-level information.')
-    parser.add_argument('-o', '--output_file', required=False, type=str, default='clumps_output.tsv', help='Output file from CLUMPS.')
-    parser.add_argument('-c', '--cancer_genes', required=False, type=str, default='./dat/allCancerGenes.txt', help='List of cancer genes, tab-delimited.')
-    parser.add_argument('--pdb_dir', required=False, default='./dat/pdbs/ftp.wwpdb.org/pub/pdb/data/structures/divided/pdb/', help='Directory of PDB files for parsing headers.')
+    parser.add_argument(
+        '-i', '--input_dir',
+        required=True,
+        help='<Required> Results directory from CLUMPS.'
+    )
+    parser.add_argument(
+        '-d', '--proteins_dir',
+        required=True,
+        help='<Required> Split protein directory with mutation mapping information.'
+    )
+    parser.add_argument(
+        '-p', '--uniprot_map',
+        default=os.path.join(pkg_resources.resource_filename('clumps', './dat/huniprot'), 'huniprot2pdb.run18.filt.txt'),
+        help='Aggregate file of all uniprot mappings to PDB IDs with residue-level information.'
+    )
+    parser.add_argument(
+        '-c', '--cancer_genes',
+        type=str,
+        default=os.path.join(pkg_resources.resource_filename('clumps', './dat'), 'allCancerGenes.txt'),
+        help='List of cancer genes, tab-delimited.'
+    )
+    parser.add_argument(
+        '--pdb_dir',
+        required=False,
+        default=os.path.join(pkg_resources.resource_filename('clumps', './dat/pdbs/ftp.wwpdb.org/pub/pdb/data/structures/divided/pdb/')),
+        help='Directory of PDB files for parsing headers.'
+    )
+    parser.add_argument(
+        '-o', '--output_file',
+        type=str,
+        default='clumps_summary.tsv',
+        help='Output file from CLUMPS.'
+    )
 
     args = parser.parse_args()
     cancer_genes_df = pd.read_csv('./dat/allCancerGenes.txt',sep='\t')
