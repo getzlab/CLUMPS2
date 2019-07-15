@@ -49,7 +49,7 @@ def encode(abc, n):
     if abc[1] == 'g' or abc[1] == 't':
         abc = reverse_complement(abc)
         n = compl[n]
-    return idx[(abc,n)]
+    return mutation_indices[(abc,n)]
 
 def calc_muts_spectra(input_maf, hgfile='./dat/hg19.2bit', out_file='sampleMutSpectra.txt'):
     """
@@ -61,55 +61,43 @@ def calc_muts_spectra(input_maf, hgfile='./dat/hg19.2bit', out_file='sampleMutSp
     hg = TwoBitFile(hgfile)
     sample_muts_context = defaultdict(lambda: [0]*96)
 
-    with open(input_maf, 'r') as f:
-        hdr = f.readline().strip().split('\t')
+    df = pd.read_csv(input_maf, sep='\t').loc[:,['Tumor_Sample_Barcode','Variant_Type','Chromosome','Start_position','Reference_Allele','Tumor_Seq_Allele2','ttype']]
+    df = df[df['Variant_Type']=='SNP']
 
-        iPat = hdr.index('Tumor_Sample_Barcode')
-        iClass = hdr.index('Variant_Type')
-        iChr = hdr.index('Chromosome')
-        iPos = hdr.index('Start_position')
-        iRefA = hdr.index('Reference_Allele')
-        iNewbase = hdr.index('Tumor_Seq_Allele2')
-        iTtype = hdr.index('ttype')
+    for idx,row in df.iterrows():
+        ref_base = row['Reference_Allele'].lower()
+        new_base = row['Tumor_Seq_Allele2'].lower()
 
-        for line in f:
-            line = line.strip('\n').split('\t')
+        if ref_base == '-' or new_base == '-':
+            continue
+        if len(ref_base) > 1 or len(new_base) > 1:
+            continue
 
-            # Skip if not a SNP
-            if line[iClass] != 'SNP':
-                continue
+        pos = int(row['Start_position'])
+        chromosome = str(row['Chromosome'])
 
-            reference_base = line[iRefA].lower()
-            new_base = line[iNewbase]
+        if chromosome == '23':
+            chromosome = 'X'
+        elif chromosome == '24':
+            chromosome = 'Y'
+        elif chromosome == 'MT':
+            chromosome = 'M'
 
-            if len(reference_base) != 1 or reference_base == '-':
-                continue
-            if len(new_base) != 1 or new_base == '-':
-                continue
+        abc = hg['chr'+chromosome][pos-2:pos+1].lower()
 
-            pos = int(line[iPos])
-            chromosome = line[iChr]
+        if abc[1] != ref_base and ref_base != '--':
+            print(abc, ref_base, line)
+            print('non-matching reference.')
+            continue
 
-            if chromosome == '23':
-                chromosome = 'X'
-            elif chromosome == '24':
-                chromosome = 'Y'
-            elif chromosome == 'MT':
-                chromosome = 'M'
+        pat = (row['Tumor_Sample_Barcode'], row['ttype'])
 
-            abc = hg['chr'+chromosome][pos-2:pos+1].lower()
-
-            if abc[1] != reference_base and reference_base != '--':
-                print(abc, reference_base, line)
-                print('non-matching reference.')
-                continue
-
-            pat = (line[iPat], line[iTtype]) # l[iTtype].split('-')[0]
-            try:
-                sample_muts_context[pat][encode(abc,line[iNewbase].lower())] += 1
-            except:
-                ## because of Ns
-                continue
+        try:
+            sample_muts_context[pat][encode(abc, new_base)] += 1
+        except:
+            ## because of Ns
+            print("Because of Ns")
+            continue
 
     hdr = list(mutation_indices.items())
     hdr.sort(key=lambda x:x[1])
@@ -133,24 +121,20 @@ def calc_muts_freq(input_maf, out_file='sampleMutFreq.txt'):
     di = defaultdict(lambda: defaultdict(lambda: 0))
 
     # Get Column Names
-    with open(input_maf, 'r') as f:
-        hdr = f.readline().strip().split('\t')
-        iTumorSampleBarcode = hdr.index('Tumor_Sample_Barcode')
-        iVarClass = hdr.index('Variant_Classification')
-        iTtype = hdr.index('ttype')
+    df = pd.read_csv(input_maf, sep='\t').loc[:,['Tumor_Sample_Barcode','Variant_Classification','ttype']]
 
-        for line in f:
-            line = line.strip('\n').split('\t')
+    # Compute frequency of tumor mutation
+    for idx,row in df.iterrows():
+        if row['Variant_Classification'] in coding_muts:
+            pass
+        elif row['Variant_Classification'] in noncoding_muts:
+            continue
+        else:
+            raise Exception("Mutation type {} unknown.".format(row['Variant_Classification']))
 
-            if line[iVarClass] in coding_muts:
-                pass
-            elif line[iVarClass] in noncoding_muts:
-                continue
-            else:
-                raise Exception('Mutation type {} unknown.'.format(line[iVarClass]))
+        di[row['ttype']][row['Tumor_Sample_Barcode']] += 1
 
-            di[line[iTtype]][line[iTumorSampleBarcode]] +=1
-
+    # Write out frequencies
     with open(out_file, 'w') as f:
         f.write('TTYPE\tSAMPLE\tMUT_COUNT\tTTYPE_RANK_SCORE\tZLOG_SCORE\n')
         print('Tumor Types: {}'.format(len(di)))

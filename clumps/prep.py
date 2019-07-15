@@ -28,7 +28,7 @@ def main():
     parser.add_argument('--hgfile', type=str, required=False, default='./dat/hg19.2bit', help='2bit human genome build file.')
     parser.add_argument('--fasta', type=str, required=False, default='./dat/UP000005640_9606.fasta.gz', help='Protein primary sequence fasta file.')
     parser.add_argument('--gpmaps', type=str, required=False, default='./dat/genomeProteomeMaps.txt', help='Genome Proteome Maps built from blast hits.')
-    parser.add_argument('--ttype', type=str, required=False, default='BRCA', help='Tumor type for acetylomics data.')
+    parser.add_argument('--ttype', type=str, required=False, default=None, help='Tumor type for acetylomics data.')
     args = parser.parse_args()
 
     if args.output_dir is None:
@@ -64,12 +64,25 @@ def main():
 
         # Rename for formatting
         freq_df = freq_df.reset_index().rename(columns={'patient':'SAMPLE','raw':'MUT_COUNT', 'rank_score':'TTYPE_RANK_SCORE','zlog':'ZLOG_SCORE'})
-        freq_df['TTYPE'] = args.ttype
+
+        # If tumor types are provided
+        if args.ttype is None:
+            ttype_mapping = dict(zip(input_df.patient.values, input_df.ttype.values))
+            freq_df['TTYPE'] = freq_df['SAMPLE'].apply(lambda x: ttype_mapping[x])
+        else:
+            freq_df['TTYPE'] = args.ttype
+
         freq_df.loc[:,['TTYPE','SAMPLE','MUT_COUNT','TTYPE_RANK_SCORE','ZLOG_SCORE']].to_csv(os.path.join(args.output_dir,'mut_freq.txt'), sep='\t',index=None)
 
         # Make muts file in CLUMPS Format
         muts_df = input_df[input_df['value'] == 1].loc[:,['patient','uniprot_id','site_position','geneSymbol', 'variableSites']]
-        muts_df['ttype'] = args.ttype
+
+        # If tumor types are provided
+        if args.ttype is None:
+            muts_df['ttype'] = muts_df['patient'].apply(lambda x: ttype_mapping[x])
+        else:
+            muts_df['ttype'] = args.ttype
+
         muts_df['fill'] = 'na'
         muts_df['mtype'] = 'A'
 

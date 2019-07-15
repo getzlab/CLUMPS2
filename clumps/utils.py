@@ -262,14 +262,14 @@ def wap(mut_indices, mvcorr, Mmv, DDt):
                 s[mat] += Mmv[mvcorr[i]][mvcorr[j]] * dcol[mut_indices[j]]
     return s
 
-def get_fragment_annot(pdb, ch):
+def get_fragment_annot(pdb, ch, pdb_dir):
     """
     Get pdb-fragment annotation.
 
     Returns the PDB annotation for a pdb-chain.
     """
     #Get the PDB 'fragment' annotation for pdb chain ch
-    poly = parsePDBHeader('%s/%s/pdb%s.ent.gz' % (PDB_STRUCTURES, pdb[1:3], pdb), 'polymers')
+    poly = parsePDBHeader(os.path.join(pdb_dir, pdb[1:3], "pdb{}.ent.gz".format(pdb)), 'polymers')
     for p in poly:
         if p.chid != ch:
             continue

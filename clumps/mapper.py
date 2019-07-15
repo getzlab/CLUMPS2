@@ -5,6 +5,7 @@ import gzip
 from twobitreader import TwoBitFile
 import pandas as pd
 from collections import defaultdict
+from tqdm import tqdm
 
 class GPmapper(object):
     def __init__(self, hgfile='./dat/hg19.2bit',
@@ -220,42 +221,31 @@ def make_gp_file(gpm, input_maf, output_file='muts.gp'):
     Takes in an input maf with the mutations of interest and a GPmapper object.
     """
     with open(output_file, 'w') as mfile:
-        with open(input_maf, 'r') as f:
-            h = f.readline().strip().split('\t')
+        df = pd.read_csv(input_maf, sep='\t').loc[:,['Chromosome','Start_position','Reference_Allele','Tumor_Seq_Allele2','Tumor_Sample_Barcode','ttype']]
 
-            iChr = h.index('Chromosome')
-            iPos = h.index('Start_position')
-            iRefAllele = h.index('Reference_Allele')
-            iTumAllele2 = h.index('Tumor_Seq_Allele2')
-            iPatient = h.index('Tumor_Sample_Barcode')
-            iTtype = h.index('ttype')
+        mfile.write('\t'.join(['patient', 'ttype', 'chr', 'pos', 'refbase', 'newbase', 'uniprot_change']) + '\n')
 
-            mfile.write('\t'.join(['patient', 'ttype', 'chr', 'pos', 'refbase', 'newbase', 'uniprot_change']) + '\n')
-            COUNTER = 0
+        for idx,row in df.iterrows():
+            ref_base = row['Reference_Allele']
+            new_base = row['Tumor_Seq_Allele2']
 
-            for line in f:
-                maf_line = line.strip('\n').split('\t')
+            if ref_base == '-' or new_base == '-':
+                continue
+            if len(ref_base) > 1 or len(new_base) > 1:
+                continue
 
-                if len(maf_line[iTumAllele2]) > 1 or maf_line[iTumAllele2] == '-':
-                    continue
-                if len(maf_line[iRefAllele]) > 1 or maf_line[iRefAllele] == '-':
-                    continue
+            # protien:AA-site-newAA
+            protein_aa_change = gpm.map_gen2prot(str(row['Chromosome']), int(row['Start_position']), None, None, new_base)
+            if not protein_aa_change:
+                continue
 
-                # newly mutated base
-                newbase = maf_line[iTumAllele2]
+            protein_aa_change = '; '.join(map(lambda x:'%s:%s%d%s' % (x[0], x[2], x[1], x[3]), protein_aa_change))
 
-                # protien:AA-site-newAA
-                protein_aa_change = gpm.map_gen2prot(maf_line[iChr], int(maf_line[iPos]), None, None, newbase)
-                if not protein_aa_change:
-                    continue
+            # Join all and write out to file
+            nl = [row['Tumor_Sample_Barcode'],row['ttype'],str(row['Chromosome']),str(row['Start_position']),row['Reference_Allele'],new_base,protein_aa_change]
+            mfile.write('\t'.join(nl) + '\n')
 
-                protein_aa_change = '; '.join(map(lambda x:'%s:%s%d%s' % (x[0], x[2], x[1], x[3]), protein_aa_change))
-
-                # Join all
-                nl = [maf_line[iPatient], maf_line[iTtype], maf_line[iChr], maf_line[iPos], maf_line[iRefAllele], newbase, protein_aa_change]
-
-                mfile.write('\t'.join(nl) + '\n')
-        print(COUNTER)
+        print("\n{} mutations mapped to protein coordinates".format(idx))
 
 def split_muts_file(input_gp, split_protein_dir='splitByProtein', mut_types=set(['M'])):
     """
@@ -278,8 +268,13 @@ def split_muts_file(input_gp, split_protein_dir='splitByProtein', mut_types=set(
         for line in f:
             line = line.strip('\n').split('\t')
 
-            if not line[iUniprotChange]:
-                continue
+            try:
+                if not line[iUniprotChange]:
+                    print(line)
+                    continue
+            except:
+                print(line)
+                print(iUniprotChange)
 
             # List all Protein Mutations
             # Determines the mutatation type

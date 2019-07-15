@@ -18,6 +18,7 @@ def main():
     parser.add_argument('-p', '--uniprot_map', required=False, default='./dat/huniprot/huniprot2pdb.run18.filt.txt', help='Aggregate file of all uniprot mappings to PDB IDs with residue-level information.')
     parser.add_argument('-o', '--output_file', required=False, type=str, default='clumps_output.tsv', help='Output file from CLUMPS.')
     parser.add_argument('-c', '--cancer_genes', required=False, type=str, default='./dat/allCancerGenes.txt', help='List of cancer genes, tab-delimited.')
+    parser.add_argument('--pdb_dir', required=False, default='./dat/pdbs/ftp.wwpdb.org/pub/pdb/data/structures/divided/pdb/', help='Directory of PDB files for parsing headers.')
 
     args = parser.parse_args()
     cancer_genes_df = pd.read_csv('./dat/allCancerGenes.txt',sep='\t')
@@ -56,13 +57,14 @@ def main():
     #----------------------------------------
     # Uniprot --> set({residue_id: (sample, ttype)})
     prot2muts = defaultdict(lambda: defaultdict(set))
+    import traceback
 
-    with open('./dat/huniprot/huniprot2pdb.run18.filt.txt', 'r') as f:
+    with open(args.uniprot_map, 'r') as f:
         for line in tqdm(f, desc='Parsing through UNIPROT mappings'):
             line = line.strip('\n').split('\t',4)
             # UNIPROT1, UNIPROT2, PDB-CH, STRAND, AA-MAP
             try:
-                with open(os.path.join('./acetyl_protein_dir/', line[0]), 'r') as mut_file:
+                with open(os.path.join(args.proteins_dir, line[0]), 'r') as mut_file:
                     for mut_line in mut_file:
                         mut_line = mut_line.strip().split('\t')
                         # TUMOR_TYPE, SAMPLE, na, UNIPROT, MUT_SITE, SITE, MUT_TYPE
@@ -81,7 +83,7 @@ def main():
     # (Uniprot1, Uniprot2, PDB-chain, residue_id) --> set([sample, ttype])
     struct2covsamples = {}
 
-    with open('./dat/huniprot/huniprot2pdb.run18.filt.txt', 'r') as f:
+    with open(args.uniprot_map, 'r') as f:
         for line in tqdm(f, desc='Parsing through UNIPROT mappings'):
             line = line.strip('\n').split('\t',4)
             # UNIPROT1, UNIPROT2, PDB-CH, STRAND, AA-MAP
@@ -126,32 +128,33 @@ def main():
 
         try:
             with open(os.path.join(args.input_dir, result_file)) as f:
-                    dat = f.readlines()
+                dat = f.readlines()
 
-                    if not dat or dat == ['#\n']:
-                        # empty file: not tested dur to some filter
-                        continue
+                if not dat or dat == ['#\n']:
+                    # empty file: not tested dur to some filter
+                    continue
 
-                    if dat[-1] != '#0\n':
-                        print('WW: potentially insufficient number of simulations for %s' % fn)
+                if dat[-1] != '#0\n':
+                    print('WW: potentially insufficient number of simulations for %s' % fn)
 
-                    pval_dim = len(dat[0].split('\t'))
-                    P = [[0,0] for x in range(pval_dim)]
+                pval_dim = len(dat[0].split('\t'))
+                P = [[0,0] for x in range(pval_dim)]
 
-                    for i in range(0,len(dat),2):
-                        l = dat[i].strip().split('\t')
-                        for j in range(pval_dim):
-                            e,d = map(int, l[j].split('/'))  ## enumerator, denominator
-                            P[j][0] += e
-                            P[j][1] += d
+                for i in range(0,len(dat),2):
+                    l = dat[i].strip().split('\t')
+                    for j in range(pval_dim):
+                        e,d = map(int, l[j].split('/'))  ## enumerator, denominator
+                        P[j][0] += e
+                        P[j][1] += d
 
-                    # Array of p-values
-                    P = [x[0]/float(x[1]) for x in P]
+                # Array of p-values
+                P = [x[0]/float(x[1]) for x in P]
         except:
-            print('EE', results_file)
+            print('EE', result_file)
             continue
 
         if (u1,u2,pdbch,rs) not in struct2startend:
+            print("Not found in mapping: ", result_file)
             continue
 
         start_res,end_res,iden,covmuts,covmuts_sites = struct2startend[(u1,u2,pdbch,rs)]
@@ -245,7 +248,7 @@ def main():
                  'IN_CANCER_GENE_LISTS':cancerannot,
                  'MAPPED_UNIPROT_ID':l[0],
                  'PDBID-CHAIN':l[1],
-                 'PDB_FRAGMENT': get_fragment_annot(pdb, ch),
+                 'PDB_FRAGMENT': get_fragment_annot(pdb, ch, args.pdb_dir),
                  'UNIPROT_SEQ_LENGTH':str(protlen),
                  'MAP_START':str(l[2]),
                  'MAP_END':str(l[3]),
@@ -259,7 +262,6 @@ def main():
             outdata.append(l)
 
     # Multiple Hypothesis Testing
-    print("Multiple hypothesis testing...")
     pvals = [i['CLUMPS_P'] for i in outdata]
     qvals = multipletests(pvals, method='fdr_bh')[1]
 

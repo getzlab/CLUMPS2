@@ -20,6 +20,13 @@ from samplers.MutspecCoverageSampler import *
 from utils import hill, parse_resmap, load_mut_freqs, wap
 from utils import get_distance_matrix, transform_distance_matrix, get_pdb_muts_overlap, map_pos_with_weights
 
+
+def mkdir(path):
+    try:
+        os.makedirs(path)
+    except FileExistsError:
+        pass
+
 def main():
     parser = argparse.ArgumentParser(description='Run CLUMPS.')
     parser.add_argument('-d','--muts', required=True, type=str, help='<Required> Directory of files titled with Uniprot IDs that have mutation information')
@@ -99,6 +106,8 @@ def main():
     if args.sampler is not 'UniformSampler':
         print("Building mapper...")
         gpm = GPmapper()
+
+    mkdir(args.out_dir)
 
     with contextlib.ExitStack() as stack:
         if args.sampler is not "UniformSampler":
