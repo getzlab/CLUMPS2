@@ -6,6 +6,7 @@ from tqdm import tqdm
 from statsmodels.sandbox.stats.multicomp import multipletests
 import urllib.request as urllib2
 import argparse
+import pkg_resources
 
 from .utils import get_fragment_annot
 
@@ -46,7 +47,7 @@ def main():
     )
 
     args = parser.parse_args()
-    cancer_genes_df = pd.read_csv('./dat/allCancerGenes.txt',sep='\t')
+    cancer_genes_df = pd.read_csv(args.cancer_genes,sep='\t')
 
     #----------------------------------------
     # Uniprot to Gene Mapping

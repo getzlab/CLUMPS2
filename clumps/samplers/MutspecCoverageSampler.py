@@ -2,11 +2,10 @@ import random
 import scipy as sp
 from Bio.Data.CodonTable import standard_dna_table
 from .CoverageSampler import CoverageSampler
-
-compl = {'a':'t', 'c':'g', 'g':'c', 't':'a'}
+from ..utils import BASE_COMPLEMENT
 
 def reverse_complement(abc):
-    return compl[abc[2]] + compl[abc[1]] + compl[abc[0]]
+    return BASE_COMPLEMENT[abc[2]] + BASE_COMPLEMENT[abc[1]] + BASE_COMPLEMENT[abc[0]]
 
 class MutspecCoverageSampler(CoverageSampler):
     def __init__(self, availUPresid, upid, covtrack, mutSpectraFn, gpm):
@@ -95,12 +94,12 @@ class MutspecCoverageSampler(CoverageSampler):
                         if 'n' in trin:
                             continue
                         if not forward:
-                            j = compl[j]
+                            j = BASE_COMPLEMENT[j]
                         if trin[1] in ['a','c']:
                             self.aa2conteff[ip].append(self.conefindex[(trin,j)])
                         else:
                             trin = reverse_complement(trin)
-                            self.aa2conteff[ip].append(self.conefindex[(trin,compl[j])])
+                            self.aa2conteff[ip].append(self.conefindex[(trin,BASE_COMPLEMENT[j])])
 
 
     def calcMutSpecProbs(self, md):
@@ -112,6 +111,7 @@ class MutspecCoverageSampler(CoverageSampler):
             for pat in md[pos][2]:
                 if pat not in patprobs:
                     patprobs[pat] = []
+
         for pat in patprobs:
             #totalmut = float(sum(self.patcounts[pat] ))  ## total mutations in patient
             for i in self.availUPresid:
@@ -130,7 +130,8 @@ class MutspecCoverageSampler(CoverageSampler):
             else:
                 patprobs[pat] = [x/denom for x in patprobs[pat]]
         for pos in md:
-            if pos not in self.aa2conteff:  ## because it was in the blacklist
+            if pos not in self.aa2conteff:
+                ## because it was in the blacklist
                 #print 'WARNING: check if residue %s maps to blacklisted positions (it should)' % pos
                 continue
             if len(md[pos][2]) == 1:
@@ -147,7 +148,10 @@ class MutspecCoverageSampler(CoverageSampler):
                 for i in range(len(self.availUPresid)):
                     for j in md[pos][2]:
                         p[i].append(patprobs[j][i])
-                p = map(lambda x:len(x) and sp.median(x) or 0, p)
+
+                #p = map(lambda x: len(x) and sp.median(x) or 0, p)
+                print("--------------*-*-*----MAKING EDITS ----*-*-*----------------")
+                p = [sp.median(x) if len(x) else 0 for x in p]
             ## multiply by coverage vector
             p = [p[i]*self.covprobs[i] for i in range(len(self.availUPresid))]
             p = [i/sum(p) for i in p]
