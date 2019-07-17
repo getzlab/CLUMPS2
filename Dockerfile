@@ -10,15 +10,15 @@ RUN apt-get update && \
     apt-get clean;
 
 # Install python3
-RUN install_packages python3 python3-pip
-RUN pip3 install setuptools
+RUN install_packages python3 python3-pip python3-dev
+RUN python3 -m pip install --upgrade pip setuptools
 
 # Copy github
 RUN mkdir clumps
 COPY . /clumps/
 
 # Install clumps
-RUN pip3 install -e ./clumps/.
+RUN python3 -m pip install -e ./clumps/.
 
 # Test
 RUN clumps -h
