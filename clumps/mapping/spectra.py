@@ -42,7 +42,7 @@ def calc_muts_spectra(input_maf, hgfile='../../dat/hg19.2bit', out_file='sampleM
         abc = hg['chr'+chromosome][pos-2:pos+1].lower()
 
         if abc[1] != ref_base and ref_base != '--':
-            print(abc, ref_base, line)
+            print(abc, ref_base)
             print('non-matching reference.')
             continue
 

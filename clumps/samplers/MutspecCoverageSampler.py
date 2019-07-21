@@ -148,9 +148,7 @@ class MutspecCoverageSampler(CoverageSampler):
                 for i in range(len(self.availUPresid)):
                     for j in md[pos][2]:
                         p[i].append(patprobs[j][i])
-
-                #p = map(lambda x: len(x) and sp.median(x) or 0, p)
-                print("--------------*-*-*----MAKING EDITS ----*-*-*----------------")
+                        
                 p = [sp.median(x) if len(x) else 0 for x in p]
             ## multiply by coverage vector
             p = [p[i]*self.covprobs[i] for i in range(len(self.availUPresid))]

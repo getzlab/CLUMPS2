@@ -10,6 +10,7 @@ from multiprocessing import Process, Queue
 import pkg_resources
 import pandas as pd
 import numpy as np
+import math
 
 from canine import Orchestrator
 from canine.utils import ArgumentHelper
@@ -173,12 +174,11 @@ def main():
     # SLURM Bindings
     #----------------------------------------
     if args.slurm:
-        # TODO: finish dockerizing
         # TODO: test this
 
         pipeline = {
             'name': 'wumps',
-            'script': ["sudo docker run --rm -v $CANINE_ROOT:$CANINE_ROOT gcr.io/broad-cga-sanand-gtex/clumps python clumps.py "],
+            'script': ["sudo docker run --rm -v $CANINE_ROOT:$CANINE_ROOT gcr.io/broad-cga-sanand-gtex/clumps clumps "],
             'inputs': {},
             'resources': {
                 'cpus-per-task': 1,
@@ -189,28 +189,35 @@ def main():
                 'name': 'slorb-clumps',
                 'compute_zone': 'us-east1-b',
                 'controller_type': 'n1-standard-4',
-                'worker_type': 'n1-highcpu-4'
+                'worker_type': 'n1-highcpu-4',
+                'compute_script': 'sudo docker pull gcr.io/broad-cga-sanand-gtex/clumps'
+
             },
             'outputs': {
                 'clumps_output': args.out_dir+"/*"
+            },
+            'localization': {
+                'transfer_bucket': 'sanand'
             }
 
         }
 
         for key,value in vars(args).items():
             if key == 'maps':
-                map_length = int(subprocess.run("zcat {} | wc -l".format(value), shell=True, executable='bin/bash', stdout=subprocess.PIPE).stdout.decode())
-                chonk_size = map_length / args.n_jobs
+                map_length = int(subprocess.run("zcat {} | wc -l".format(value), shell=True, executable='/bin/bash', stdout=subprocess.PIPE).stdout.decode())
+                chonk_size = math.ceil(map_length / args.n_jobs)
 
-                subprocess.check_call("zcat {} | split -d -l {} - huniprot_split_maps_ && gzip huniprot_split_maps_*".format(args.maps, chonk_size))
+                subprocess.check_call("zcat {} | split -d -l {} - huniprot_split_maps_ && gzip huniprot_split_maps_*".format(args.maps, chonk_size), shell=True, executable='/bin/bash')
                 pipeline['inputs']['maps'] = glob("huniprot_split_maps_*")
 
             elif key is not 'slurm':
-                pipeline['inputs'][key] = value
+                pipeline['inputs'][key] = value if key != 'xpo' else str(value)
 
             pipeline['script'][0] += "--{0} ${0} ".format(key)
 
         batch_id, jobs, outputs, sacct = Orchestrator(pipeline).run_pipeline()
+        
+        return
 
     #----------------------------------------
     # CLUMPS
