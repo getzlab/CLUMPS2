@@ -1,6 +1,5 @@
 import os
 import sys
-
 from tqdm import tqdm
 import argparse
 from Bio.Seq import Seq
@@ -9,33 +8,57 @@ from twobitreader import TwoBitFile
 import pandas as pd
 from collections import defaultdict
 import numpy as np
+import pkg_resources
 
-from mapper import GPmapper, make_gp_file, split_muts_file
-from spectra import calc_muts_spectra, calc_muts_freq
-
-def makedir(dirname):
-    try:
-        os.mkdir(dirname)
-    except FileExistsError:
-        print("{} already exists.".format(dirname))
-
+from .mapping.mapper import GPmapper, make_gp_file, split_muts_file
+from .mapping.spectra import calc_muts_spectra, calc_muts_freq
+from .utils import mkdir
 
 def main():
     parser = argparse.ArgumentParser(description='Prepare inputs for CLUMPS.')
-    parser.add_argument('-i','--input', required=True, type=str, help='<Required> Input file for CLUMPS. Default is to expect an input .maf file, but a processed acetylomics file, already in protein coordinates, is allowed using -a option.')
-    parser.add_argument('-o', '--output_dir', type=str, required=False, help='Output directory for CLUMPS input files.')
-    parser.add_argument('-a','--acetylomics', dest='acetyl_flag', action='store_true', help='Flag to indicate input is already in protein coordinates.')
+    parser.add_argument(
+        '-i','--input',
+        required=True,
+        type=str,
+        help='<Required> Input file for CLUMPS. Default expects .maf, acetylomcs \
+            allowed with -a flag.'
+    )
+    parser.add_argument(
+        '-o', '--output_dir',
+        type=str,
+        help='Output directory for CLUMPS input files.',
+        default='clumps_output'
+    )
+    parser.add_argument(
+        '-a','--acetylomics',
+        dest='acetyl_flag',
+        action='store_true',
+        help='Flag to indicate input is already in protein coordinates.'
+    )
+    parser.add_argument(
+        '--hgfile', type=str,
+        default=os.path.join(pkg_resources.resource_filename('clumps', './dat'), 'hg19.2bit'),
+        help='2bit human genome build file.'
+    )
+    parser.add_argument(
+        '--fasta',
+        type=str,
+        default=os.path.join(pkg_resources.resource_filename('clumps', './dat'), 'UP000005640_9606.fasta.gz'),
+        help='Protein primary sequence fasta file.'
+    )
+    parser.add_argument(
+        '--gpmaps',
+        type=str,
+        default=os.path.join(pkg_resources.resource_filename('clumps', './dat'), 'genomeProteomeMaps.txt'),
+        help='Genome Proteome Maps built from blast hits.'
+    )
 
-    parser.add_argument('--hgfile', type=str, required=False, default='./dat/hg19.2bit', help='2bit human genome build file.')
-    parser.add_argument('--fasta', type=str, required=False, default='./dat/UP000005640_9606.fasta.gz', help='Protein primary sequence fasta file.')
-    parser.add_argument('--gpmaps', type=str, required=False, default='./dat/genomeProteomeMaps.txt', help='Genome Proteome Maps built from blast hits.')
-    parser.add_argument('--ttype', type=str, required=False, default='BRCA', help='Tumor type for acetylomics data.')
     args = parser.parse_args()
 
     if args.output_dir is None:
         args.output_dir = args.input.split('.')[-2].split('/')[-1]
 
-    makedir(args.output_dir)
+    mkdir(args.output_dir)
 
     if args.acetyl_flag:
         """
@@ -57,7 +80,6 @@ def main():
         # Make frequency file in CLUMPS Format
         freq_df = input_df.groupby('patient').sum().sort_values('value').rename(columns={'value':'raw'}).drop(columns='site_position')
         freq_df['log10'] = np.log10(freq_df['raw'])
-
         meanmf = np.mean(freq_df['log10'])
         sdmf = np.std(freq_df['log10'])
         freq_df['zlog'] = 1.0 / (np.log10(freq_df['raw'] - meanmf) / sdmf)
@@ -65,19 +87,25 @@ def main():
 
         # Rename for formatting
         freq_df = freq_df.reset_index().rename(columns={'patient':'SAMPLE','raw':'MUT_COUNT', 'rank_score':'TTYPE_RANK_SCORE','zlog':'ZLOG_SCORE'})
-        freq_df['TTYPE'] = args.ttype
-        freq_df.loc[:,['TTYPE','SAMPLE','MUT_COUNT','TTYPE_RANK_SCORE','ZLOG_SCORE']].to_csv(os.path.join(args.output_dir,'mut_spectra.txt'), sep='\t',index=None)
+
+        # Tumor types
+        ttype_mapping = dict(zip(input_df.patient.values, input_df.ttype.values))
+        freq_df['TTYPE'] = freq_df['SAMPLE'].apply(lambda x: ttype_mapping[x])
+
+        freq_df.loc[:,['TTYPE','SAMPLE','MUT_COUNT','TTYPE_RANK_SCORE','ZLOG_SCORE']].to_csv(os.path.join(args.output_dir,'mut_freq.txt'), sep='\t',index=None)
 
         # Make muts file in CLUMPS Format
         muts_df = input_df[input_df['value'] == 1].loc[:,['patient','uniprot_id','site_position','geneSymbol', 'variableSites']]
-        muts_df['ttype'] = args.ttype
+
+        # If tumor types are provided
+        muts_df['ttype'] = muts_df['patient'].apply(lambda x: ttype_mapping[x])
         muts_df['fill'] = 'na'
         muts_df['mtype'] = 'A'
 
         muts_df = muts_df.loc[:,['ttype','patient','fill','uniprot_id','variableSites','site_position','mtype']]
         muts_df.to_csv(os.path.join(args.output_dir,'muts.gp'), sep='\t')
 
-        makedir(os.path.join(args.output_dir,'split_proteins'))
+        mkdir(os.path.join(args.output_dir,'split_proteins'))
 
         # Create split protein Directory
         for uniprot in tqdm(set(muts_df['uniprot_id']), desc='Creating split protein directories.'):
@@ -108,9 +136,6 @@ def main():
         # Mutational Frequencies
         # Find number of mutations, tumor-type, rank score, zlog score
         calc_muts_freq(args.input, out_file=os.path.join(args.output_dir,'mut_freq.txt'))
-
-
-
 
 if __name__ == "__main__":
 	main()
