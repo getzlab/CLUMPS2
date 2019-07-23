@@ -71,6 +71,7 @@ class MutspecCoverageSampler(CoverageSampler):
                     ip = pex[ie][0][0] + 1
                 else:
                     ip = pex[ie][1][0] + (pex[ie][1][1] > 0)
+
         self.aa2conteff = {}
         for ip in aa2genpos:
             self.aa2conteff[ip] = []
@@ -82,6 +83,14 @@ class MutspecCoverageSampler(CoverageSampler):
             origaa = self.codonTable[origcodon]
             if origaa != self.gpm.sp[upid][ip-1]:
                 print(origaa, self.gpm.sp[upid][ip-1], ip-1, gposs)
+
+                print(ip)
+                print(origcodon)
+                print(availUPresid, upid)
+                print(self.codonTable)
+                print(self.gpm.sp[upid])
+                import pdb; pdb.set_trace()  
+
                 raise Exception('Translation does not match the reference!')
             for i in range(3):  ## codon position
                 ## test which change will create a missense mutation
@@ -148,7 +157,7 @@ class MutspecCoverageSampler(CoverageSampler):
                 for i in range(len(self.availUPresid)):
                     for j in md[pos][2]:
                         p[i].append(patprobs[j][i])
-                        
+
                 p = [sp.median(x) if len(x) else 0 for x in p]
             ## multiply by coverage vector
             p = [p[i]*self.covprobs[i] for i in range(len(self.availUPresid))]
