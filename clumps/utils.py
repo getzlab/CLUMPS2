@@ -3,13 +3,14 @@ import os
 import random
 import re
 import scipy as sp
-import urllib
 import numpy as np
 from gzip import GzipFile
 from lxml import etree
 from prody import parsePDBStream, parsePDBHeader
 from scipy.spatial.distance import euclidean
 from collections import defaultdict
+
+from prody import confProDy
 
 import contextlib
 import tempfile
@@ -55,7 +56,6 @@ def reverse_complement(abc):
     """
     Reverse codon.
     """
-    BASE_COMPLEMENT = {'a':'t', 'c':'g', 'g':'c', 't':'a'}
     return BASE_COMPLEMENT[abc[2]] + BASE_COMPLEMENT[abc[1]] + BASE_COMPLEMENT[abc[0]]
 
 def encode(abc, n):
@@ -115,6 +115,8 @@ def gunzipper(gz_file):
     with tempfile.NamedTemporaryFile('r', suffix=os.path.splitext(gz_file)[1]) as temp_file:
         subprocess.check_call("gzip -dc {} >> {}".format(gz_file, temp_file.name), executable='/bin/bash', shell=True)
         yield temp_file
+
+confProDy(verbosity='none')
 
 def get_distance_matrix(pdbch, pdb_structures_dir, point='centroid', pdb_resids=None, return_centroid_coordinates=False):
     """

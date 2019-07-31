@@ -1,8 +1,10 @@
 import random
 import scipy as sp
 from Bio.Data.CodonTable import standard_dna_table
+
 from .CoverageSampler import CoverageSampler
 from ..utils import BASE_COMPLEMENT
+from ..utils import reverse_complement
 
 def reverse_complement(abc):
     return BASE_COMPLEMENT[abc[2]] + BASE_COMPLEMENT[abc[1]] + BASE_COMPLEMENT[abc[0]]
@@ -82,16 +84,8 @@ class MutspecCoverageSampler(CoverageSampler):
                 gposs.reverse()
             origaa = self.codonTable[origcodon]
             if origaa != self.gpm.sp[upid][ip-1]:
-                print(origaa, self.gpm.sp[upid][ip-1], ip-1, gposs)
+                raise Exception('Translation does not match the reference!', availUPresid, upid)
 
-                print(ip)
-                print(origcodon)
-                print(availUPresid, upid)
-                print(self.codonTable)
-                print(self.gpm.sp[upid])
-                import pdb; pdb.set_trace()  
-
-                raise Exception('Translation does not match the reference!')
             for i in range(3):  ## codon position
                 ## test which change will create a missense mutation
                 for j in ['a','c','g','t']:

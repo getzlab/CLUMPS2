@@ -11,6 +11,7 @@ import pkg_resources
 import pandas as pd
 import numpy as np
 import math
+from tqdm import tqdm
 
 from canine import Orchestrator
 from canine.utils import ArgumentHelper
@@ -216,7 +217,7 @@ def main():
             pipeline['script'][0] += "--{0} ${0} ".format(key)
 
         batch_id, jobs, outputs, sacct = Orchestrator(pipeline).run_pipeline()
-        
+
         return
 
     #----------------------------------------
@@ -236,7 +237,7 @@ def main():
             stack.enter_context(CoverageSampler.start_jvm())
 
         with gzip.open(args.maps, 'r') as f:
-            for idx,line in enumerate(f):
+            for idx,line in tqdm(enumerate(f), desc=args.maps.split('/')[-1].split('.')[0]):
                 u1,u2,pdbch,alidt,resmap = line.decode('utf-8').strip('\n').split('\t', 4)
 
                 if os.path.isfile(os.path.join(args.muts, u1)):
@@ -274,7 +275,7 @@ def main():
                         # Transform distance matrix
                         DDt = transform_distance_matrix(D, ur, args.xpo)
 
-                        print("Sampling {} | {} - {}".format(u1, pdbch, mi))
+                        # print("Sampling {} | {} - {}".format(u1, pdbch, mi))
 
                         # Compute matrix
                         ## matrix that holds mv[i]*mv[j] values (sqrt or not)
@@ -305,8 +306,12 @@ def main():
                         elif args.sampler == 'CoverageSampler':
                             sam = CoverageSampler(ur, u1, args.coverage_track, gpm)
                         elif args.sampler == 'MutspecCoverageSampler':
-                            sam = MutspecCoverageSampler(ur, u1, args.coverage_track, args.mut_spectra, gpm)
-                            sam.calcMutSpecProbs(protein_muts)
+                            try:
+                                sam = MutspecCoverageSampler(ur, u1, args.coverage_track, args.mut_spectra, gpm)
+                                sam.calcMutSpecProbs(protein_muts)
+                            except:
+                                print("MISSED: ",u1,u2,pdbch)
+                                continue
 
                         STARTTIME=time.time()
 
