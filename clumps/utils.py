@@ -141,12 +141,18 @@ def get_distance_matrix(pdbch, pdb_structures_dir, point='centroid', pdb_resids=
     yy = aa.getCoords()
     zz = aa.getResnames()
 
+    pdb_resids = None
     if pdb_resids is None:
         pdb_resids = {}
         for i in range(len(xx)):
             if zz[i] in AMINO_ACID_MAP:
                 pdb_resids[xx[i]] = True
         pdb_resids = sorted(pdb_resids.keys())
+
+    mapped_pdb_to_aa = defaultdict(set)
+    for idx,resnum in enumerate(xx):
+        if resnum in pdb_resids:
+            mapped_pdb_to_aa[resnum].add(zz[idx])
 
     coords = {}
     for i in range(len(xx)):
@@ -190,9 +196,9 @@ def get_distance_matrix(pdbch, pdb_structures_dir, point='centroid', pdb_resids=
         raise Exception('Unknown setting for point: %s' % point)
 
     if return_centroid_coordinates:
-        return (D, pdb_resids, co)
+        return (D, pdb_resids, mapped_pdb_to_aa, co)
     else:
-        return (D, pdb_resids)
+        return (D, pdb_resids, mapped_pdb_to_aa)
 
 def transform_distance_matrix(D, ur, XPO):
     """
@@ -212,20 +218,6 @@ def transform_distance_matrix(D, ur, XPO):
         DDt.append(m)
 
     return DDt
-
-# def load_mut_freqs(in_file):
-#     """
-#     Load Mutational Frequencies
-#
-#     Load mutational frequences for samples for allelic weighting.
-#     """
-#     mfreq = {}
-#     with open(in_file,'r') as f:
-#         for idx,line in enumerate(f):
-#             if idx > 0:
-#                 line = line.strip().split('\t')
-#                 mfreq[(line[0],line[1])] = float(line[4])
-#     return mfreq
 
 def load_prot_file(protein_dir, uniprot):
     """
