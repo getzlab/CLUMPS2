@@ -17,7 +17,7 @@ Or looking at the interaction of multiple protein structures:
 
 python interfaces2.py ../set/pmbl.run2 2hck B:P09619:803_A:P46109:124
 
-### interfaces_postprocess.py
+### interfaces2_postprocess.py
 
 Script to be run after each individual test is done to aggregate results
 
