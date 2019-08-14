@@ -18,13 +18,4 @@ class AcetylSampler(object):
         self.lysines_idx = [idx for idx,x in enumerate(self.res_id) if x in self.lysines]
 
     def sample(self, mi):
-        try:
-            return (sorted(random.sample(self.lysines_idx, len(mi))),  sp.random.permutation(len(mi)))
-        except:
-            print(mi)
-            print(self.res_id)
-            print(self.lysines)
-            print(self.lysines_idx)
-            print(self.mapping)
-            traceback.print_exc()
-            sys.exit()
+        return (sorted(random.sample(self.lysines_idx, len(mi))),  sp.random.permutation(len(mi)))

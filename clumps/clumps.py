@@ -112,14 +112,12 @@ def main():
         '--use_provided_values',
         required=False,
         default=None,
-        type=int,
         help="Compute mutational frequencies with provided values."
     )
     parser.add_argument(
         '--coverage_track',
         required=False,
         default=None,
-        type=str,
         help='Coverage track for null sampler.'
     )
     parser.add_argument(
@@ -231,6 +229,12 @@ def main():
         print("Building mapper...")
         gpm = GPmapper(hgfile=args.hgfile, spfile=args.fasta, mapfile=args.gpmaps)
 
+    # Load mutational frequencies
+    if args.mut_freq is not None:
+        mfreq = pd.read_csv(args.mut_freq, sep='\t').set_index(['TTYPE','SAMPLE']).loc[:,['ZLOG_SCORE']].to_dict()['ZLOG_SCORE']
+    else:
+        mfreq = {}
+
     mkdir(args.out_dir)
 
     #----------------------------------------
@@ -245,6 +249,9 @@ def main():
                 u1,u2,pdbch,alist,resmap = line.decode('utf-8').strip('\n').split('\t', 4)
 
                 if os.path.isfile(os.path.join(args.muts, u1)):
+                    ####### Package into class #######
+                    # TODO
+                    #
                     pdbch = pdbch.split('-')
                     ur,pr,prd = parse_resmap(resmap)
 
@@ -252,11 +259,6 @@ def main():
                         print("Bad mapping for {}.".format(ur))
                         continue
 
-                    # Load mutational frequencies
-                    if args.mut_freq is not None:
-                        mfreq = pd.read_csv(args.mut_freq, sep='\t').set_index(['TTYPE','SAMPLE']).loc[:,['ZLOG_SCORE']].to_dict()['ZLOG_SCORE']
-                    else:
-                        mfreq = {}
 
                     # Load Protein file
                     protein_muts = map_pos_with_weights(args.muts, u1, mfreq, args.tumor_type, args.mut_types, args.use_provided_values, args.mut_freq)
@@ -271,12 +273,10 @@ def main():
                     if len(mi) > 0:
                         try:
                             D,x,pdb_resnames = get_distance_matrix(pdbch, args.pdb_dir, pdb_resids=pr)
+                            DDt = transform_distance_matrix(D, ur, args.xpo)
                         except:
                             print("Unable to load PDB...")
                             continue
-
-                        # Transform distance matrix
-                        DDt = transform_distance_matrix(D, ur, args.xpo)
 
                         # print("Sampling {} | {} - {}".format(u1, pdbch, mi))
 
@@ -305,22 +305,22 @@ def main():
                         mireal = [i for i in mi]
 
                         # Sampler
-                        if args.sampler == 'UniformSampler':
-                            sam = UniformSampler(ur)
-                        elif args.sampler == 'CoverageSampler':
-                            sam = CoverageSampler(ur, u1, args.coverage_track, gpm)
-                        elif args.sampler == 'MutspecCoverageSampler':
-                            try:
+                        try:
+                            if args.sampler == 'UniformSampler':
+                                sam = UniformSampler(ur)
+                            elif args.sampler == 'CoverageSampler':
+                                sam = CoverageSampler(ur, u1, args.coverage_track, gpm)
+                            elif args.sampler == 'MutspecCoverageSampler':
                                 sam = MutspecCoverageSampler(ur, u1, args.coverage_track, args.mut_spectra, gpm)
                                 sam.calcMutSpecProbs(protein_muts)
-                            except:
-                                print("MISSED: ",u1,u2,pdbch)
-                                import traceback; traceback.print_exc()
-                                sys.exit()
-                                continue
-                        elif args.sampler == 'AcetylSampler':
-                            sam = AcetylSampler(pr, pdb_resnames)
+                            elif args.sampler == 'AcetylSampler':
+                                sam = AcetylSampler(pr, pdb_resnames)
 
+                            # test sampler
+                            _ = sam.sample(mireal)
+                        except:
+                            print("Error initializing {} for {} {} {}.".format(args.sampler, u1, u2, pdbch))
+                            continue
 
                         STARTTIME=time.time()
 
@@ -350,7 +350,6 @@ def main():
                                     break
 
                                 x = None
-
                                 while x is None:
                                     ## some samplers will fail to yield a sample in some (small number of) of runs due to combinatorics
                                     x = sam.sample(mireal)
