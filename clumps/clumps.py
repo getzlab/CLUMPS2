@@ -237,7 +237,7 @@ def main():
     # Run CLUMPS
     #----------------------------------------
     with contextlib.ExitStack() as stack:
-        if args.sampler is "CoverageSampler" or args.sampler is "MutspecCoverageSampler":
+        if args.sampler == 'CoverageSampler' or args.sampler == 'MutspecCoverageSampler':
             stack.enter_context(CoverageSampler.start_jvm())
 
         with gzip.open(args.maps, 'r') as f:
@@ -315,6 +315,8 @@ def main():
                                 sam.calcMutSpecProbs(protein_muts)
                             except:
                                 print("MISSED: ",u1,u2,pdbch)
+                                import traceback; traceback.print_exc()
+                                sys.exit()
                                 continue
                         elif args.sampler == 'AcetylSampler':
                             sam = AcetylSampler(pr, pdb_resnames)
