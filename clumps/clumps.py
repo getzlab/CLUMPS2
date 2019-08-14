@@ -11,6 +11,7 @@ import pkg_resources
 import pandas as pd
 import numpy as np
 import math
+from tqdm import tqdm
 
 from canine import Orchestrator
 from canine.utils import ArgumentHelper
@@ -18,6 +19,8 @@ from canine.utils import ArgumentHelper
 from .samplers.UniformSampler import *
 from .samplers.CoverageSampler import *
 from .samplers.MutspecCoverageSampler import *
+from .samplers.AcetylSampler import *
+
 from .mapping.mapper import GPmapper
 from .utils import hill, parse_resmap, wap
 from .utils import get_distance_matrix, transform_distance_matrix, get_pdb_muts_overlap, map_pos_with_weights
@@ -59,7 +62,7 @@ def main():
         '--sampler',
         default='UniformSampler',
         help='Sampler to use for Null Model.',
-        choices=('UniformSampler','CoverageSampler','MutspecCoverageSampler')
+        choices=('UniformSampler','CoverageSampler','MutspecCoverageSampler', 'AcetylSampler')
     )
     parser.add_argument(
         '--mut_spectra',
@@ -167,8 +170,10 @@ def main():
 
     if args.sampler == 'MutspecCoverageSampler':
         assert args.mut_spectra is not None, "Provide mutational spectra data."
-    if args.sampler is not 'UniformSampler':
+    if args.sampler == 'CoverageSampler' or args.sampler == 'MutspecCoverageSampler':
         assert args.coverage_track is not None, "Provide coverage track for null model."
+    if args.sampler == 'AcetylSampler':
+        assert 'A' in args.mut_types, "Specify only Acetylation events in model."
 
     #----------------------------------------
     # SLURM Bindings
@@ -216,13 +221,13 @@ def main():
             pipeline['script'][0] += "--{0} ${0} ".format(key)
 
         batch_id, jobs, outputs, sacct = Orchestrator(pipeline).run_pipeline()
-        
+
         return
 
     #----------------------------------------
     # CLUMPS
     #----------------------------------------
-    if args.sampler is not 'UniformSampler':
+    if args.sampler == 'CoverageSampler' or args.sampler == 'MutspecCoverageSampler':
         print("Building mapper...")
         gpm = GPmapper(hgfile=args.hgfile, spfile=args.fasta, mapfile=args.gpmaps)
 
@@ -232,12 +237,12 @@ def main():
     # Run CLUMPS
     #----------------------------------------
     with contextlib.ExitStack() as stack:
-        if args.sampler is not "UniformSampler":
+        if args.sampler == 'CoverageSampler' or args.sampler == 'MutspecCoverageSampler':
             stack.enter_context(CoverageSampler.start_jvm())
 
         with gzip.open(args.maps, 'r') as f:
-            for idx,line in enumerate(f):
-                u1,u2,pdbch,alidt,resmap = line.decode('utf-8').strip('\n').split('\t', 4)
+            for idx,line in tqdm(enumerate(f), desc=args.maps.split('/')[-1].split('.')[0]):
+                u1,u2,pdbch,alist,resmap = line.decode('utf-8').strip('\n').split('\t', 4)
 
                 if os.path.isfile(os.path.join(args.muts, u1)):
                     pdbch = pdbch.split('-')
@@ -248,7 +253,6 @@ def main():
                         continue
 
                     # Load mutational frequencies
-                    #mfreq = load_mut_freqs(args.mut_freq)
                     if args.mut_freq is not None:
                         mfreq = pd.read_csv(args.mut_freq, sep='\t').set_index(['TTYPE','SAMPLE']).loc[:,['ZLOG_SCORE']].to_dict()['ZLOG_SCORE']
                     else:
@@ -266,7 +270,7 @@ def main():
                     # Load AA residue coordinates
                     if len(mi) > 0:
                         try:
-                            D,x = get_distance_matrix(pdbch, args.pdb_dir, pdb_resids=pr)
+                            D,x,pdb_resnames = get_distance_matrix(pdbch, args.pdb_dir, pdb_resids=pr)
                         except:
                             print("Unable to load PDB...")
                             continue
@@ -274,7 +278,7 @@ def main():
                         # Transform distance matrix
                         DDt = transform_distance_matrix(D, ur, args.xpo)
 
-                        print("Sampling {} | {} - {}".format(u1, pdbch, mi))
+                        # print("Sampling {} | {} - {}".format(u1, pdbch, mi))
 
                         # Compute matrix
                         ## matrix that holds mv[i]*mv[j] values (sqrt or not)
@@ -294,19 +298,29 @@ def main():
                         # Compute WAP score
                         wap_obs = wap(mi, mvcorr, Mmv, DDt)
 
-                        # Create Null Model
+                        # Create Null Sampler
                         rnd = 0
                         P = [0]*len(args.xpo)
                         WAP_RND = [0]*len(args.xpo)
                         mireal = [i for i in mi]
 
+                        # Sampler
                         if args.sampler == 'UniformSampler':
                             sam = UniformSampler(ur)
                         elif args.sampler == 'CoverageSampler':
                             sam = CoverageSampler(ur, u1, args.coverage_track, gpm)
                         elif args.sampler == 'MutspecCoverageSampler':
-                            sam = MutspecCoverageSampler(ur, u1, args.coverage_track, args.mut_spectra, gpm)
-                            sam.calcMutSpecProbs(protein_muts)
+                            try:
+                                sam = MutspecCoverageSampler(ur, u1, args.coverage_track, args.mut_spectra, gpm)
+                                sam.calcMutSpecProbs(protein_muts)
+                            except:
+                                print("MISSED: ",u1,u2,pdbch)
+                                import traceback; traceback.print_exc()
+                                sys.exit()
+                                continue
+                        elif args.sampler == 'AcetylSampler':
+                            sam = AcetylSampler(pr, pdb_resnames)
+
 
                         STARTTIME=time.time()
 

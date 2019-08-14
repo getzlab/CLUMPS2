@@ -134,7 +134,7 @@ optional arguments:
 - [x] Add support for mutspec and coverage samplers (issue with `.jar` files)
 - [x] Write acetyolomics pipeilne into processing script
 - [x] Re-wite post-processing
-- [ ] Finish DockerFile
+- [x] Finish DockerFile
 - [ ] Example data/test cases
 - [ ] Support for slurm for `clumps.py` via `canine`
 - [ ] Update `genomeProteomeMaps.txt` files with recent PDB database; add Hg38 support
