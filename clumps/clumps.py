@@ -20,6 +20,7 @@ from .samplers.UniformSampler import *
 from .samplers.CoverageSampler import *
 from .samplers.MutspecCoverageSampler import *
 from .samplers.AcetylSampler import *
+from .samplers.PhosphoSampler import *
 
 from .mapping.mapper import GPmapper
 from .utils import hill, parse_resmap, wap
@@ -62,7 +63,7 @@ def main():
         '--sampler',
         default='UniformSampler',
         help='Sampler to use for Null Model.',
-        choices=('UniformSampler','CoverageSampler','MutspecCoverageSampler', 'AcetylSampler')
+        choices=('UniformSampler','CoverageSampler','MutspecCoverageSampler', 'AcetylSampler', 'PhosphoSampler')
     )
     parser.add_argument(
         '--mut_spectra',
@@ -172,6 +173,8 @@ def main():
         assert args.coverage_track is not None, "Provide coverage track for null model."
     if args.sampler == 'AcetylSampler':
         assert 'A' in args.mut_types, "Specify only Acetylation events in model."
+    if args.sampler == 'PhosphoSampler':
+        assert 'P' in args.mut_types, "Specify only Phosphorylation events in model."
 
     #----------------------------------------
     # SLURM Bindings
@@ -206,17 +209,17 @@ def main():
         }
 
         for key,value in vars(args).items():
-            if key == 'maps':
-                map_length = int(subprocess.run("zcat {} | wc -l".format(value), shell=True, executable='/bin/bash', stdout=subprocess.PIPE).stdout.decode())
-                chonk_size = math.ceil(map_length / args.n_jobs)
+            if value is not None:
+                if key == 'maps':
+                    map_length = int(subprocess.run("zcat {} | wc -l".format(value), shell=True, executable='/bin/bash', stdout=subprocess.PIPE).stdout.decode())
+                    chonk_size = math.ceil(map_length / args.n_jobs)
 
-                subprocess.check_call("zcat {} | split -d -l {} - huniprot_split_maps_ && gzip huniprot_split_maps_*".format(args.maps, chonk_size), shell=True, executable='/bin/bash')
-                pipeline['inputs']['maps'] = glob("huniprot_split_maps_*")
+                    subprocess.check_call("zcat {} | split -d -l {} - huniprot_split_maps_ && gzip huniprot_split_maps_*".format(args.maps, chonk_size), shell=True, executable='/bin/bash')
+                    pipeline['inputs']['maps'] = glob("huniprot_split_maps_*")
 
-            elif key is not 'slurm':
-                pipeline['inputs'][key] = value if key != 'xpo' else str(value)
-
-            pipeline['script'][0] += "--{0} ${0} ".format(key)
+                elif key is not 'slurm':
+                    pipeline['inputs'][key] = value if key != 'xpo' else str(value)
+                    pipeline['script'][0] += "--{0} ${0} ".format(key)
 
         batch_id, jobs, outputs, sacct = Orchestrator(pipeline).run_pipeline()
 
@@ -315,6 +318,8 @@ def main():
                                 sam.calcMutSpecProbs(protein_muts)
                             elif args.sampler == 'AcetylSampler':
                                 sam = AcetylSampler(pr, pdb_resnames)
+                            elif args.sampler == 'PhosphoSampler':
+                                sam = PhosphoSampler(pr, pdb_resnames)
 
                             # test sampler
                             _ = sam.sample(mireal)

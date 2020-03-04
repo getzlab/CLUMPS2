@@ -62,20 +62,23 @@ def main():
 
     if args.acetyl_flag:
         """
-        Input is a processed .csv file.
+        Input is a processed .tsv file.
 
         -------------------------------------------
         Ex.:
-            	patient	uniprot_id	site_position	accession_number	geneSymbol	variableSites	accession_numbers	value
-            0	X11BR047	P02768	28	NP_000468.1	ALB	K28k	NP_000468.1	1
-            1	X11BR047	P02768	36	NP_000468.1	ALB	K36k	NP_000468.1	1
-            2	X11BR047	P02768	44	NP_000468.1	ALB	K44k	NP_000468.1	1
-            3	X11BR047	P02768	65	NP_000468.1	ALB	K65k	NP_000468.1	0
-            4	X11BR047	P02768	75	NP_000468.1	ALB	K75k	NP_000468.1	1
+            	patient	uniprot_id	site_position	accession_number	geneSymbol	variableSites	accession_numbers	value mtype
+            0	X11BR047	P02768	28	NP_000468.1	ALB	K28k	NP_000468.1	1 A
+            1	X11BR047	P02768	36	NP_000468.1	ALB	K36k	NP_000468.1	1 A
+            2	X11BR047	P02768	44	NP_000468.1	ALB	K44k	NP_000468.1	1 A
+            3	X11BR047	P02768	65	NP_000468.1	ALB	K65k	NP_000468.1	0 A
+            4	X11BR047	P02768	75	NP_000468.1	ALB	K75k	NP_000468.1	1 A
             ...
 
         """
         input_df = pd.read_csv(args.input, sep='\t')
+
+        for v in ('patient','value','site_position','ttype', 'geneSymbol','uniprot_id','mtype'):
+            assert v in input_df, "Missing {} column in input.".format(v)
 
         # Make frequency file in CLUMPS Format
         freq_df = input_df.groupby('patient').sum().sort_values('value').rename(columns={'value':'raw'}).drop(columns='site_position')
@@ -95,14 +98,13 @@ def main():
         freq_df.loc[:,['TTYPE','SAMPLE','MUT_COUNT','TTYPE_RANK_SCORE','ZLOG_SCORE']].to_csv(os.path.join(args.output_dir,'mut_freq.txt'), sep='\t',index=None)
 
         # Make muts file in CLUMPS Format
-        muts_df = input_df[input_df['value'] == 1].loc[:,['patient','uniprot_id','site_position','geneSymbol', 'variableSites']]
+        muts_df = input_df[input_df['value'] == 1].loc[:,['patient', 'uniprot_id','site_position','geneSymbol', 'variableSites', 'mtype']]
 
         # If tumor types are provided
         muts_df['ttype'] = muts_df['patient'].apply(lambda x: ttype_mapping[x])
         muts_df['fill'] = 'na'
-        muts_df['mtype'] = 'A'
 
-        muts_df = muts_df.loc[:,['ttype','patient','fill','uniprot_id','variableSites','site_position','mtype']]
+        muts_df = muts_df.loc[:,['ttype', 'patient', 'fill', 'uniprot_id', 'variableSites', 'site_position', 'mtype']]
         muts_df.to_csv(os.path.join(args.output_dir,'muts.gp'), sep='\t')
 
         mkdir(os.path.join(args.output_dir,'split_proteins'))
