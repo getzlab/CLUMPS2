@@ -11,13 +11,14 @@ setup(
         "scipy>=1.3.0",
         "pyopenssl>=19.0.0",
         "prody>=1.10.10",
-        "mkl-random>=1.0.1",
-        "mkl-fft>=1.0.6",
+        #"mkl-random>=1.0.1",
+        #"mkl-fft>=1.0.6",
         "lxml>=4.3.4",
         "jpype1>=0.7.0",
         "canine>=0.1.3",
         "biopython>=1.73",
-        "tqdm>=4.32.1"
+        "tqdm>=4.32.1",
+        "agutils"
     ],
     entry_points={
         'console_scripts':[
