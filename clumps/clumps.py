@@ -350,7 +350,7 @@ def main():
 
                             exitstatus=0  ## 0 means terminated OK, 1 means it had to abort due to timeout
                             while rnd < args.max_rand/args.threads and (rnd%1000 or booster()):  ## booster is applied once per 1000 randomizations
-                                if not rnd%1000 and (time.time()-STARTTIME)/60.0 > 1:
+                                if not rnd%1000 and (time.time()-STARTTIME)/7200.0 > 1:
                                     exitstatus=1
                                     break
 
