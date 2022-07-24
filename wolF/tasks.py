@@ -164,7 +164,8 @@ def clumps_workflow(
         "coverage_track_index" : coverage_track[:-4] + ".fwi", # FIXME: hack to avoid recreating the rodisk
         "genome_2bit" : localization["genome_2bit"],
         "fasta" : localization["fasta"],
-        "gpmaps" : localization["gpmaps"]
+        "gpmaps" : localization["gpmaps"],
+        "sampler" : sampler
       }
     )
 
