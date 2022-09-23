@@ -332,7 +332,7 @@ def main():
 
                         STARTTIME=time.time()
 
-                        def rndThread():
+                        def rndThread(qu):
                             def booster():
                                 """
                                 Implements the booster algorithm by Getz et al. that saves CPU time.
@@ -372,34 +372,27 @@ def main():
                                         p[rr] += 1
                                 rnd += 1
 
-                            return rnd,p,wap_rnd,exitstatus
+                            qu.put((rnd,p,wap_rnd,exitstatus))
 
-                        rnd,p,wap_rnd,exitstatus = rndThread()
-                        totalrnd = rnd
-                        totalexitstatus = exitstatus
-                        for i in range(len(args.xpo)):
-                            P[i] += p[i]
-                            WAP_RND[i] += wap_rnd[i]
+                        queue = Queue()
+                        pcs = []
+                        for r in range(args.threads):
+                            x = Process(target=rndThread, args=(queue,))
+                            x.start()
+                            pcs.append(x)
 
-#                        queue = Queue()
-#                        pcs = []
-#                        for r in range(args.threads):
-#                            x = Process(target=rndThread, args=(queue,))
-#                            x.start()
-#                            pcs.append(x)
-#
-#                        for x in pcs:
-#                            x.join()
-#
-#                        totalrnd = 0
-#                        totalexitstatus = 0
-#                        for r in range(args.threads):
-#                            rnd,p,wap_rnd,exitstatus = queue.get()
-#                            totalrnd += rnd
-#                            totalexitstatus += exitstatus
-#                            for i in range(len(args.xpo)):
-#                                P[i] += p[i]
-#                                WAP_RND[i] += wap_rnd[i]
+                        for x in pcs:
+                            x.join()
+
+                        totalrnd = 0
+                        totalexitstatus = 0
+                        for r in range(args.threads):
+                            rnd,p,wap_rnd,exitstatus = queue.get()
+                            totalrnd += rnd
+                            totalexitstatus += exitstatus
+                            for i in range(len(args.xpo)):
+                                P[i] += p[i]
+                                WAP_RND[i] += wap_rnd[i]
 
                         with open(os.path.join(args.out_dir, '%s-%d_%s_%s_%s-%s_%s' % (args.maps.rsplit('.',1)[0].rsplit('_',1)[1], idx, u1, u2, pdbch[0], pdbch[1], resmap.split(':',1)[0])), 'a') as f:
                             f.write('\t'.join(['%d/%d' % (P[i], totalrnd) for i in range(len(P))]) + '\n')
