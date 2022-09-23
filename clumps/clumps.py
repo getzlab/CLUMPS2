@@ -23,8 +23,8 @@ from .samplers.AcetylSampler import *
 from .samplers.PhosphoSampler import *
 
 from .mapping.mapper import GPmapper
-from .utils import hill, parse_resmap, wap
-from .utils import get_distance_matrix, transform_distance_matrix, get_pdb_muts_overlap, map_pos_with_weights
+from .utils import hill, parse_resmap, wap, fwap
+from .utils import get_distance_matrix, transform_distance_matrix, get_pdb_muts_overlap, map_pos_with_weights, transform_distance_matrix2
 from .utils import mkdir
 
 def main():
@@ -271,6 +271,7 @@ def main():
                     ## mv: normalized mutation count at each residue
                     ## mt: cancer types contributing mutations
                     mi,mv,mt = get_pdb_muts_overlap(ur, protein_muts, args.hill_exp, args.use_provided_values)
+                    mv = np.c_[mv]
 
                     # Load AA residue coordinates
                     if len(mi) > 0:
@@ -281,6 +282,7 @@ def main():
                             print("Unable to load PDB...")
                             continue
 
+                        DDt2 = np.tril(transform_distance_matrix2(D, args.xpo), -1)
                         # print("Sampling {} | {} - {}".format(u1, pdbch, mi))
 
                         # Compute matrix
@@ -299,7 +301,8 @@ def main():
                             Mmv.append(mrow)
 
                         # Compute WAP score
-                        wap_obs = wap(mi, mvcorr, Mmv, DDt)
+                        #wap_obs = wap(mi, mvcorr, Mmv, DDt)
+                        wap_obs = fwap(mi, mv, DDt2)
 
                         # Create Null Sampler
                         rnd = 0
@@ -329,7 +332,7 @@ def main():
 
                         STARTTIME=time.time()
 
-                        def rndThread(qu):
+                        def rndThread():
                             def booster():
                                 """
                                 Implements the booster algorithm by Getz et al. that saves CPU time.
@@ -360,7 +363,8 @@ def main():
                                     x = sam.sample(mireal)
 
                                 mi,mvcorr = x
-                                r = wap(mi, mvcorr, Mmv, DDt)
+                                #r = wap(mi, mvcorr, Mmv, DDt)
+                                r = fwap(mi, mv[mvcorr], DDt2)
 
                                 for rr in range(len(args.xpo)):
                                     wap_rnd[rr] += r[rr]
@@ -368,27 +372,34 @@ def main():
                                         p[rr] += 1
                                 rnd += 1
 
-                            qu.put((rnd,p,wap_rnd,exitstatus))
+                            return rnd,p,wap_rnd,exitstatus
 
-                        queue = Queue()
-                        pcs = []
-                        for r in range(args.threads):
-                            x = Process(target=rndThread, args=(queue,))
-                            x.start()
-                            pcs.append(x)
+                        rnd,p,wap_rnd,exitstatus = rndThread()
+                        totalrnd = rnd
+                        totalexitstatus = exitstatus
+                        for i in range(len(args.xpo)):
+                            P[i] += p[i]
+                            WAP_RND[i] += wap_rnd[i]
 
-                        for x in pcs:
-                            x.join()
-
-                        totalrnd = 0
-                        totalexitstatus = 0
-                        for r in range(args.threads):
-                            rnd,p,wap_rnd,exitstatus = queue.get()
-                            totalrnd += rnd
-                            totalexitstatus += exitstatus
-                            for i in range(len(args.xpo)):
-                                P[i] += p[i]
-                                WAP_RND[i] += wap_rnd[i]
+#                        queue = Queue()
+#                        pcs = []
+#                        for r in range(args.threads):
+#                            x = Process(target=rndThread, args=(queue,))
+#                            x.start()
+#                            pcs.append(x)
+#
+#                        for x in pcs:
+#                            x.join()
+#
+#                        totalrnd = 0
+#                        totalexitstatus = 0
+#                        for r in range(args.threads):
+#                            rnd,p,wap_rnd,exitstatus = queue.get()
+#                            totalrnd += rnd
+#                            totalexitstatus += exitstatus
+#                            for i in range(len(args.xpo)):
+#                                P[i] += p[i]
+#                                WAP_RND[i] += wap_rnd[i]
 
                         with open(os.path.join(args.out_dir, '%s-%d_%s_%s_%s-%s_%s' % (args.maps.rsplit('.',1)[0].rsplit('_',1)[1], idx, u1, u2, pdbch[0], pdbch[1], resmap.split(':',1)[0])), 'a') as f:
                             f.write('\t'.join(['%d/%d' % (P[i], totalrnd) for i in range(len(P))]) + '\n')

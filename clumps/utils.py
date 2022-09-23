@@ -163,9 +163,7 @@ def get_distance_matrix(pdbch, pdb_structures_dir, point='centroid', pdb_resids=
         coords[xx[i]].append(yy[i])  ## add coordinates of an atom belonging to this residue
 
     ## Euclidean distance matrix
-    D = []
-    for i in range(len(pdb_resids)):
-        D.append(sp.zeros(i, dtype=sp.float32))
+    D = np.zeros(len(pdb_resids)*np.r_[1, 1])
 
     if point == 'centroid':
         ## distance between centroids
@@ -216,6 +214,19 @@ def transform_distance_matrix(D, ur, XPO):
                 mrow[j] = sp.exp(-(D[i][j]**2)/den)
             m.append(mrow)
         DDt.append(m)
+
+    return DDt
+
+def transform_distance_matrix2(D, XPO):
+    """
+    Transform distance matrix.
+    --------------------------
+    Transforms distance matrix.
+    """
+    DDt = []  ## array of transformed distance matrices
+    for soft_thresh_idx in range(len(XPO)):
+        den = 2.0 * XPO[soft_thresh_idx]**2
+        DDt.append(np.exp(-D**2/den))
 
     return DDt
 
@@ -315,7 +326,14 @@ def wap(mut_indices, mvcorr, Mmv, DDt):
             dcol = d[mut_indices[i]]
             for j in range(i):
                 s[mat] += Mmv[mvcorr[i]][mvcorr[j]] * dcol[mut_indices[j]]
+    
     return s
+
+def fwap(mi, mv, DDt):
+    scores = np.zeros(len(DDt))
+    for xpo_idx in range(len(DDt)):
+        scores[xpo_idx] = mv.T@DDt[xpo_idx][mi, :][:, mi]@mv
+    return scores
 
 def get_fragment_annot(pdb, ch, pdb_dir):
     """
