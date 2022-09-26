@@ -68,7 +68,7 @@ class CoverageSampler(object):
         Start Java VM.
         """
         try:
-            jpype.startJVM(jpype.getDefaultJVMPath(), '-ea', '-Djava.class.path=/home/sanand/getzlab-CLUMPS2/clumps/samplers/FixedWidthBinary.jar')
+            jpype.startJVM(jpype.getDefaultJVMPath(), '-ea', '-Djava.class.path=/build/clumps/samplers/FixedWidthBinary.jar')
             cls.FixedWidthBinary = jpype.JPackage('org').broadinstitute.cga.tools.seq.FixedWidthBinary
             yield
         finally:

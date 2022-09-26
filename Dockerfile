@@ -1,5 +1,7 @@
-FROM ubuntu:18.04
+FROM gcr.io/broad-getzlab-workflows/base_image:v0.0.5
 MAINTAINER Shankara Anand
+
+WORKDIR /build
 
 RUN apt-get update && apt-get install software-properties-common -y &&\
 apt-get update &&  apt-get install build-essential git zlib1g-dev \
@@ -10,20 +12,10 @@ RUN apt-get update && \
     apt-get install -y openjdk-8-jre-headless && \
     apt-get clean
 
-# Install python3
-RUN add-apt-repository ppa:deadsnakes/ppa && apt-get update
-RUN apt-get install -y python3.6 python3-pip python3.6-dev
-RUN python3 -m pip install --upgrade pip setuptools
-
-# Copy github
-RUN mkdir clumps
-COPY . /clumps/
+COPY . /build
 
 # Install clumps
-RUN python3 -m pip install -e ./clumps/.
-
-# Cheese b/c Aaron sucks
-RUN python3 -m pip install --no-cache-dir firecloud-dalmatian>=0.0.16
+RUN python3 -m pip install -e .
 
 # Test
 RUN clumps -h

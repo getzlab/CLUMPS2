@@ -54,14 +54,14 @@ def main():
     #----------------------------------------
     mapdi = {}
 
-    with urllib2.urlopen('http://www.uniprot.org/uniprot/?query=reviewed:yes+AND+organism:9606&columns=id,entry%20name,reviewed,protein%20names,genes,organism,length,database(geneid)&format=tab') as f:
+    with urllib2.urlopen('https://rest.uniprot.org/uniprotkb/stream?fields=id,accession,reviewed,protein_name,gene_names,organism_name,length,xref_geneid&format=tsv&query=reviewed:true+AND+organism_id:9606') as f:
         for idx,line in tqdm(enumerate(f), desc='Mapping Uniprots'):
             if idx == 0:
                 hdr = line.decode('utf-8').strip().split('\t')
                 iEntry = hdr.index('Entry')
                 iLength = hdr.index('Length')
-                iGn = hdr.index('Gene names')
-                iEntrez = hdr.index('Cross-reference (geneid)')
+                iGn = hdr.index('Gene Names')
+                iEntrez = hdr.index('GeneID')
             else:
                 line = line.decode('utf-8').strip('\n').split('\t')
                 mapdi[line[iEntry]] = [map(lambda x:x.strip(';').strip('.'), line[iEntrez].split()), line[iGn], line[iLength]]
