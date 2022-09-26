@@ -23,8 +23,8 @@ from .samplers.AcetylSampler import *
 from .samplers.PhosphoSampler import *
 
 from .mapping.mapper import GPmapper
-from .utils import hill, parse_resmap, wap
-from .utils import get_distance_matrix, transform_distance_matrix, get_pdb_muts_overlap, map_pos_with_weights
+from .utils import hill, parse_resmap, wap, fwap
+from .utils import get_distance_matrix, transform_distance_matrix, get_pdb_muts_overlap, map_pos_with_weights, transform_distance_matrix2
 from .utils import mkdir
 
 def main():
@@ -271,12 +271,14 @@ def main():
                     ## mv: normalized mutation count at each residue
                     ## mt: cancer types contributing mutations
                     mi,mv,mt = get_pdb_muts_overlap(ur, protein_muts, args.hill_exp, args.use_provided_values)
+                    mv = np.c_[mv]
 
                     # Load AA residue coordinates
                     if len(mi) > 0:
                         try:
                             D,x,pdb_resnames = get_distance_matrix(pdbch, args.pdb_dir, pdb_resids=pr)
-                            DDt = transform_distance_matrix(D, ur, args.xpo)
+                            #DDt = transform_distance_matrix(D, ur, args.xpo)
+                            DDt2 = np.tril(transform_distance_matrix2(D, args.xpo), -1)
                         except:
                             print("Unable to load PDB...")
                             continue
@@ -285,21 +287,22 @@ def main():
 
                         # Compute matrix
                         ## matrix that holds mv[i]*mv[j] values (sqrt or not)
-                        Mmv = []
-                        mvcorr = range(len(mv))
+                        #Mmv = []
+                        #mvcorr = range(len(mv))
 
-                        for i in range(len(mi)):
-                            mrow = np.zeros(len(mi), np.float64)
-                            for j in range(len(mi)):
-                                #mrow[j] = np.sqrt(mv[i]*mv[j])  ## geometric mean; actually does not perform better in most cases
-                                if args.pancan_factor == 1.0:
-                                    mrow[j] = mv[i]*mv[j]
-                                else:
-                                    mrow[j] = (args.pancan_factor + (1.0-args.pancan_factor)*(len(mt[i] & mt[j])>0)) * mv[i]*mv[j]          ## product
-                            Mmv.append(mrow)
+#                        for i in range(len(mi)):
+#                            mrow = np.zeros(len(mi), np.float64)
+#                            for j in range(len(mi)):
+#                                #mrow[j] = np.sqrt(mv[i]*mv[j])  ## geometric mean; actually does not perform better in most cases
+#                                if args.pancan_factor == 1.0:
+#                                    mrow[j] = mv[i]*mv[j]
+#                                else:
+#                                    mrow[j] = (args.pancan_factor + (1.0-args.pancan_factor)*(len(mt[i] & mt[j])>0)) * mv[i]*mv[j]          ## product
+#                            Mmv.append(mrow)
 
                         # Compute WAP score
-                        wap_obs = wap(mi, mvcorr, Mmv, DDt)
+                        #wap_obs = wap(mi, mvcorr, Mmv, DDt)
+                        wap_obs = fwap(mi, mv, DDt2)
 
                         # Create Null Sampler
                         rnd = 0
@@ -359,8 +362,9 @@ def main():
                                     ## some samplers will fail to yield a sample in some (small number of) of runs due to combinatorics
                                     x = sam.sample(mireal)
 
-                                mi,mvcorr = x
-                                r = wap(mi, mvcorr, Mmv, DDt)
+                                mi_perm, mut_perm_idx = x
+                                #r = wap(mi, mvcorr, Mmv, DDt)
+                                r = fwap(mi_perm, mv[mut_perm_idx], DDt2)
 
                                 for rr in range(len(args.xpo)):
                                     wap_rnd[rr] += r[rr]
