@@ -95,7 +95,7 @@ def parse_resmap(resmap):
         pr.append(int(y))
         prd[int(y)] = True
 
-    return ur,pr,prd
+    return np.r_[ur],np.r_[pr],prd
 
 @contextlib.contextmanager
 def gunzipper(gz_file):
@@ -141,13 +141,18 @@ def get_distance_matrix(pdbch, pdb_structures_dir, point='centroid', pdb_resids=
     yy = aa.getCoords()
     zz = aa.getResnames()
 
-    pdb_resids = None
+    # if list of PDB residues is not provided, look them up
     if pdb_resids is None:
         pdb_resids = {}
         for i in range(len(xx)):
             if zz[i] in AMINO_ACID_MAP:
                 pdb_resids[xx[i]] = True
         pdb_resids = sorted(pdb_resids.keys())
+
+    # otherwise, perform sanity check that provided residue list comprises valid amino acids
+    else:
+        if len(set(pdb_resids) - set(xx[np.r_[[z in AMINO_ACID_MAP for z in zz]]])):
+            raise ValueError("Invalid PDB residues specified!")
 
     mapped_pdb_to_aa = defaultdict(set)
     for idx,resnum in enumerate(xx):

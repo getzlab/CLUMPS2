@@ -12,6 +12,7 @@ import pandas as pd
 import numpy as np
 import math
 from tqdm import tqdm
+import sys
 
 from canine import Orchestrator
 from canine.utils import ArgumentHelper
@@ -256,12 +257,19 @@ def main():
                     # TODO
                     #
                     pdbch = pdbch.split('-')
-                    ur,pr,prd = parse_resmap(resmap)
+                    ur,pr,_ = parse_resmap(resmap)
 
                     if len(ur) < 5:
                         print("Bad mapping for {}.".format(ur))
                         continue
 
+                    # Remove non-unique UniProt -> PDB mappings (cause of this unknown)
+                    nuidx = np.flatnonzero(np.bincount(pr) > 1)
+                    if len(nuidx):
+                        rmidx = np.isin(pr, nuidx)
+                        pr = pr[~rmidx]
+                        ur = ur[~rmidx]
+                        print(f"WARNING: removed {rmidx.sum()} residues with non-unique UniProt -> PDB mappings!", file = sys.stderr)
 
                     # Load Protein file
                     protein_muts = map_pos_with_weights(args.muts, u1, mfreq, args.tumor_type, args.mut_types, args.use_provided_values, args.mut_freq)
