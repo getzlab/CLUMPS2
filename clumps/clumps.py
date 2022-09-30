@@ -263,7 +263,14 @@ def main():
                         print("Bad mapping for {}.".format(ur), file = sys.stderr)
                         continue
 
-                    # Remove non-unique UniProt -> PDB mappings (cause of this unknown)
+                    # Remove negative UniProt -> PDB mappings (cause unknown)
+                    negidx = pr < 0
+                    if negidx.any():
+                        pr = pr[~negidx]
+                        ur = ur[~negidx]
+                        print(f"WARNING: removed {negidx.sum()} residues with invalide (negative) UniProt -> PDB mappings!", file = sys.stderr)
+
+                    # Remove non-unique UniProt -> PDB mappings (cause also unknown)
                     nuidx = np.flatnonzero(np.bincount(pr) > 1)
                     if len(nuidx):
                         rmidx = np.isin(pr, nuidx)
