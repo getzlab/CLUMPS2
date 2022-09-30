@@ -163,7 +163,7 @@ def main():
         args.tumor_type = None
 
     if args.tumor_type and args.pancan_factor != 1.0:
-        print('WARNING: args.pancan_factor is not 1 althought args.tumor_type is set. Correcting to args.pancan_factor=1')
+        print('WARNING: args.pancan_factor is not 1 althought args.tumor_type is set. Correcting to args.pancan_factor=1', file = sys.stderr)
         args.pancan_factor = 1.0
 
     args.mut_types = set(args.mut_types)
@@ -230,7 +230,7 @@ def main():
     # CLUMPS
     #----------------------------------------
     if args.sampler == 'CoverageSampler' or args.sampler == 'MutspecCoverageSampler':
-        print("Building mapper...")
+        print("Building mapper...", file = sys.stderr)
         gpm = GPmapper(hgfile=args.hgfile, spfile=args.fasta, mapfile=args.gpmaps)
 
     # Load mutational frequencies
@@ -260,7 +260,7 @@ def main():
                     ur,pr,_ = parse_resmap(resmap)
 
                     if len(ur) < 5:
-                        print("Bad mapping for {}.".format(ur))
+                        print("Bad mapping for {}.".format(ur), file = sys.stderr)
                         continue
 
                     # Remove non-unique UniProt -> PDB mappings (cause of this unknown)
@@ -288,7 +288,7 @@ def main():
                             #DDt = transform_distance_matrix(D, ur, args.xpo)
                             DDt2 = np.tril(transform_distance_matrix2(D, args.xpo), -1)
                         except:
-                            print("Unable to load PDB...")
+                            print("Unable to load PDB...", file = sys.stderr)
                             continue
 
                         # print("Sampling {} | {} - {}".format(u1, pdbch, mi))
@@ -335,7 +335,7 @@ def main():
                             # test sampler
                             _ = sam.sample(mireal)
                         except:
-                            print("Error initializing {} for {} {} {}.".format(args.sampler, u1, u2, pdbch))
+                            print("Error initializing {} for {} {} {}.".format(args.sampler, u1, u2, pdbch), file = sys.stderr)
                             continue
 
                         STARTTIME=time.time()
