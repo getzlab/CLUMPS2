@@ -263,14 +263,13 @@ def main():
                         print("Bad mapping for {}.".format(ur), file = sys.stderr)
                         continue
 
-                    # Remove negative UniProt -> PDB mappings (cause unknown)
-                    negidx = pr < 0
-                    if negidx.any():
-                        pr = pr[~negidx]
-                        ur = ur[~negidx]
-                        print(f"WARNING: removed {negidx.sum()} residues with invalide (negative) UniProt -> PDB mappings!", file = sys.stderr)
+                    # Skip structure if there are any negative UniProt -> PDB mappings
+                    # (cause unknown, but likely an unusably bad structure)
+                    if (pr < 0).any():
+                        print(f"WARNING: skipping structure {u1} ({ppdbch}) due to negative UniProt -> PDB mappings!", file = sys.stderr)
+                        continue
 
-                    # Remove non-unique UniProt -> PDB mappings (cause also unknown)
+                    # Remove non-unique UniProt -> PDB mappings (likely due to wonky homology modeling)
                     nuidx = np.flatnonzero(np.bincount(pr) > 1)
                     if len(nuidx):
                         rmidx = np.isin(pr, nuidx)
