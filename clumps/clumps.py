@@ -266,7 +266,7 @@ def main():
                     # Skip structure if there are any negative UniProt -> PDB mappings
                     # (cause unknown, but likely an unusably bad structure)
                     if (pr < 0).any():
-                        print(f"WARNING: skipping structure {u1} ({ppdbch}) due to negative UniProt -> PDB mappings!", file = sys.stderr)
+                        print(f"WARNING: skipping structure {u1} ({pdbch}) due to negative UniProt -> PDB mappings!", file = sys.stderr)
                         continue
 
                     # Remove non-unique UniProt -> PDB mappings (likely due to wonky homology modeling)
