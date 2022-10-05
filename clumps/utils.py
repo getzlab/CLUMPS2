@@ -168,8 +168,6 @@ def get_distance_matrix(pdbch, pdb_structures_dir, point='centroid', pdb_resids=
         coords[xx[i]].append(yy[i])  ## add coordinates of an atom belonging to this residue
 
     ## Euclidean distance matrix
-    D = np.zeros(len(pdb_resids)*np.r_[1, 1])
-
     if point == 'centroid':
         ## distance between centroids
         ## calculate residue centroid positions
@@ -177,13 +175,13 @@ def get_distance_matrix(pdbch, pdb_structures_dir, point='centroid', pdb_resids=
         for k in coords:
             centroids[k] = np.mean(np.array(coords[k]), 0)
 
-        co = [centroids[i] for i in pdb_resids]  ## pdb residue coordinates
-
-        for i in range(len(pdb_resids)):
-            for j in range(i):
-                D[i][j] = euclidean(co[i], co[j])
+        co = np.c_[[centroids[i] for i in pdb_resids]]  ## pdb residue coordinates
+        co2 = (co**2).sum(1, keepdims = True)
+        D = co2 + co2.T - 2*co@co.T
 
     elif point == 'min':
+        D = np.zeros(len(pdb_resids)*np.r_[1, 1])
+
         ## min-distance (atom pairs)
         co = [coords[i] for i in pdb_resids]  ## pdb atom coordinates
         for i in range(len(pdb_resids)):
@@ -195,6 +193,7 @@ def get_distance_matrix(pdbch, pdb_structures_dir, point='centroid', pdb_resids=
                         if e < m:
                             m = e
                 D[i][j] = m
+        D = D**2 # TODO: optimize this using fast method employed in centroid method
     else:
         raise Exception('Unknown setting for point: %s' % point)
 
@@ -216,7 +215,7 @@ def transform_distance_matrix(D, ur, XPO):
         for i in range(len(ur)):
             mrow = sp.zeros(i, dtype=sp.float32)
             for j in range(i):
-                mrow[j] = sp.exp(-(D[i][j]**2)/den)
+                mrow[j] = sp.exp(-(D[i][j])/den)
             m.append(mrow)
         DDt.append(m)
 
@@ -231,7 +230,7 @@ def transform_distance_matrix2(D, XPO):
     DDt = []  ## array of transformed distance matrices
     for soft_thresh_idx in range(len(XPO)):
         den = 2.0 * XPO[soft_thresh_idx]**2
-        DDt.append(np.exp(-D**2/den))
+        DDt.append(np.exp(-D/den))
 
     return DDt
 
