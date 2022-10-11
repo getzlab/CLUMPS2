@@ -240,7 +240,7 @@ def main():
     outdata = []
     min_mut_samples = 0
 
-    for u1 in u1structs_filt:
+    for u1 in tqdm(u1structs_filt, 'Collating results, formatting output'):
         for l in u1structs_filt[u1]:
             cancerannot = ''
 
@@ -268,24 +268,26 @@ def main():
             sites = list(l[8])
             sites.sort()
             sites = [str(x) for x in sites]
-
-            l = {'UNIPROT_ID':u1,
-                 'GENE_NAMES':gename,
-                 'IN_CANCER_GENE_LISTS':cancerannot,
-                 'MAPPED_UNIPROT_ID':l[0],
-                 'PDBID-CHAIN':l[1],
-                 'PDB_FRAGMENT': get_fragment_annot(pdb, ch, args.pdb_dir),
-                 'UNIPROT_SEQ_LENGTH':str(protlen),
-                 'MAP_START':str(l[2]),
-                 'MAP_END':str(l[3]),
-                 'PERCENT_IDENTITY':'%.1f' % l[4],
-                 'NSITES':str(l[6]),
-                 'SITES':'+'.join(sites),
-                 'NSAMPLES':str(l[7]),
-                 'CLUMPS_P':l[5][2],
-                 'CLUMPS_Q_FULL':-1,
-                 'CLUMPS_Q_RESTRICTED':-1}
-            outdata.append(l)
+            try:
+                l = {'UNIPROT_ID':u1,
+                     'GENE_NAMES':gename,
+                     'IN_CANCER_GENE_LISTS':cancerannot,
+                     'MAPPED_UNIPROT_ID':l[0],
+                     'PDBID-CHAIN':l[1],
+                     'PDB_FRAGMENT': get_fragment_annot(pdb, ch, args.pdb_dir),
+                     'UNIPROT_SEQ_LENGTH':str(protlen),
+                     'MAP_START':str(l[2]),
+                     'MAP_END':str(l[3]),
+                     'PERCENT_IDENTITY':'%.1f' % l[4],
+                     'NSITES':str(l[6]),
+                     'SITES':'+'.join(sites),
+                     'NSAMPLES':str(l[7]),
+                     'CLUMPS_P':l[5][2],
+                     'CLUMPS_Q_FULL':-1,
+                     'CLUMPS_Q_RESTRICTED':-1}
+                outdata.append(l)
+            except:
+                print('encountered error in %s' % u1) 
 
     # Multiple Hypothesis Testing
     pvals = [i['CLUMPS_P'] for i in outdata]
