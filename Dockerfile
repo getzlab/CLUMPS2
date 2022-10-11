@@ -12,9 +12,11 @@ RUN apt-get update && \
     apt-get install -y openjdk-8-jre-headless && \
     apt-get clean
 
-COPY . /build
+# Install prerequisites 
+RUN pip install twobitreader statsmodels scipy pyopenssl prody mkl-random mkl-fft lxml jpype1 canine biopython tqdm
 
 # Install clumps
+COPY . /build
 RUN python3 -m pip install -e .
 
 # Test

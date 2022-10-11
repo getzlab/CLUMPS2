@@ -12,6 +12,7 @@ import pandas as pd
 import numpy as np
 import math
 from tqdm import tqdm
+import sys
 
 from canine import Orchestrator
 from canine.utils import ArgumentHelper
@@ -162,7 +163,7 @@ def main():
         args.tumor_type = None
 
     if args.tumor_type and args.pancan_factor != 1.0:
-        print('WARNING: args.pancan_factor is not 1 althought args.tumor_type is set. Correcting to args.pancan_factor=1')
+        print('WARNING: args.pancan_factor is not 1 althought args.tumor_type is set. Correcting to args.pancan_factor=1', file = sys.stderr)
         args.pancan_factor = 1.0
 
     args.mut_types = set(args.mut_types)
@@ -229,7 +230,7 @@ def main():
     # CLUMPS
     #----------------------------------------
     if args.sampler == 'CoverageSampler' or args.sampler == 'MutspecCoverageSampler':
-        print("Building mapper...")
+        print("Building mapper...", file = sys.stderr)
         gpm = GPmapper(hgfile=args.hgfile, spfile=args.fasta, mapfile=args.gpmaps)
 
     # Load mutational frequencies
@@ -256,12 +257,25 @@ def main():
                     # TODO
                     #
                     pdbch = pdbch.split('-')
-                    ur,pr,prd = parse_resmap(resmap)
+                    ur,pr,_ = parse_resmap(resmap)
 
                     if len(ur) < 5:
-                        print("Bad mapping for {}.".format(ur))
+                        print("Bad mapping for {}.".format(ur), file = sys.stderr)
                         continue
 
+                    # Skip structure if there are any negative UniProt -> PDB mappings
+                    # (cause unknown, but likely an unusably bad structure)
+                    if (pr < 0).any():
+                        print(f"WARNING: skipping structure {u1} ({pdbch}) due to negative UniProt -> PDB mappings!", file = sys.stderr)
+                        continue
+
+                    # Remove non-unique UniProt -> PDB mappings (likely due to wonky homology modeling)
+                    nuidx = np.flatnonzero(np.bincount(pr) > 1)
+                    if len(nuidx):
+                        rmidx = np.isin(pr, nuidx)
+                        pr = pr[~rmidx]
+                        ur = ur[~rmidx]
+                        print(f"WARNING: removed {rmidx.sum()} residues with non-unique UniProt -> PDB mappings!", file = sys.stderr)
 
                     # Load Protein file
                     protein_muts = map_pos_with_weights(args.muts, u1, mfreq, args.tumor_type, args.mut_types, args.use_provided_values, args.mut_freq)
@@ -280,7 +294,7 @@ def main():
                             #DDt = transform_distance_matrix(D, ur, args.xpo)
                             DDt2 = np.tril(transform_distance_matrix2(D, args.xpo), -1)
                         except:
-                            print("Unable to load PDB...")
+                            print("Unable to load PDB...", file = sys.stderr)
                             continue
 
                         # print("Sampling {} | {} - {}".format(u1, pdbch, mi))
@@ -327,7 +341,7 @@ def main():
                             # test sampler
                             _ = sam.sample(mireal)
                         except:
-                            print("Error initializing {} for {} {} {}.".format(args.sampler, u1, u2, pdbch))
+                            print("Error initializing {} for {} {} {}.".format(args.sampler, u1, u2, pdbch), file = sys.stderr)
                             continue
 
                         STARTTIME=time.time()
