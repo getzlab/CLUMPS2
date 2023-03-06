@@ -12,6 +12,7 @@ import pandas as pd
 import numpy as np
 import math
 from tqdm import tqdm
+import sys
 
 from canine import Orchestrator
 from canine.utils import ArgumentHelper
@@ -23,8 +24,8 @@ from .samplers.AcetylSampler import *
 from .samplers.PhosphoSampler import *
 
 from .mapping.mapper import GPmapper
-from .utils import hill, parse_resmap, wap
-from .utils import get_distance_matrix, transform_distance_matrix, get_pdb_muts_overlap, map_pos_with_weights
+from .utils import hill, parse_resmap, wap, fwap
+from .utils import get_distance_matrix, transform_distance_matrix, get_pdb_muts_overlap, map_pos_with_weights, transform_distance_matrix2
 from .utils import mkdir
 
 def main():
@@ -162,7 +163,7 @@ def main():
         args.tumor_type = None
 
     if args.tumor_type and args.pancan_factor != 1.0:
-        print('WARNING: args.pancan_factor is not 1 althought args.tumor_type is set. Correcting to args.pancan_factor=1')
+        print('WARNING: args.pancan_factor is not 1 althought args.tumor_type is set. Correcting to args.pancan_factor=1', file = sys.stderr)
         args.pancan_factor = 1.0
 
     args.mut_types = set(args.mut_types)
@@ -229,7 +230,7 @@ def main():
     # CLUMPS
     #----------------------------------------
     if args.sampler == 'CoverageSampler' or args.sampler == 'MutspecCoverageSampler':
-        print("Building mapper...")
+        print("Building mapper...", file = sys.stderr)
         gpm = GPmapper(hgfile=args.hgfile, spfile=args.fasta, mapfile=args.gpmaps)
 
     # Load mutational frequencies
@@ -259,14 +260,29 @@ def main():
                     # TODO
                     #
                     pdbch = pdbch.split('-')
+
                     #splits res map into two lists of number, and a dict of numbers and booleans
                     #number: boolean dict represents when numbers are identical...?
                     ur,pr,prd = parse_resmap(resmap)
 
+
                     if len(ur) < 5:
-                        print("Bad mapping for {}.".format(ur))
+                        print("Bad mapping for {}.".format(ur), file = sys.stderr)
                         continue
 
+                    # Skip structure if there are any negative UniProt -> PDB mappings
+                    # (cause unknown, but likely an unusably bad structure)
+                    if (pr < 0).any():
+                        print(f"WARNING: skipping structure {u1} ({pdbch}) due to negative UniProt -> PDB mappings!", file = sys.stderr)
+                        continue
+
+                    # Remove non-unique UniProt -> PDB mappings (likely due to wonky homology modeling)
+                    nuidx = np.flatnonzero(np.bincount(pr) > 1)
+                    if len(nuidx):
+                        rmidx = np.isin(pr, nuidx)
+                        pr = pr[~rmidx]
+                        ur = ur[~rmidx]
+                        print(f"WARNING: removed {rmidx.sum()} residues with non-unique UniProt -> PDB mappings!", file = sys.stderr)
 
                     # Load Protein file
                     protein_muts = map_pos_with_weights(args.muts, u1, mfreq, args.tumor_type, args.mut_types, args.use_provided_values, args.mut_freq)
@@ -276,35 +292,38 @@ def main():
                     ## mv: normalized mutation count at each residue
                     ## mt: cancer types contributing mutations
                     mi,mv,mt = get_pdb_muts_overlap(ur, protein_muts, args.hill_exp, args.use_provided_values)
+                    mv = np.c_[mv]
 
                     # Load AA residue coordinates
                     if len(mi) > 0:
                         try:
                             D,x,pdb_resnames = get_distance_matrix(pdbch, args.pdb_dir, pdb_resids=pr)
-                            DDt = transform_distance_matrix(D, ur, args.xpo)
+                            #DDt = transform_distance_matrix(D, ur, args.xpo)
+                            DDt2 = np.tril(transform_distance_matrix2(D, args.xpo), -1)
                         except:
-                            print("Unable to load PDB...")
+                            print("Unable to load PDB...", file = sys.stderr)
                             continue
 
                         # print("Sampling {} | {} - {}".format(u1, pdbch, mi))
 
                         # Compute matrix
                         ## matrix that holds mv[i]*mv[j] values (sqrt or not)
-                        Mmv = []
-                        mvcorr = range(len(mv))
+                        #Mmv = []
+                        #mvcorr = range(len(mv))
 
-                        for i in range(len(mi)):
-                            mrow = np.zeros(len(mi), np.float64)
-                            for j in range(len(mi)):
-                                #mrow[j] = np.sqrt(mv[i]*mv[j])  ## geometric mean; actually does not perform better in most cases
-                                if args.pancan_factor == 1.0:
-                                    mrow[j] = mv[i]*mv[j]
-                                else:
-                                    mrow[j] = (args.pancan_factor + (1.0-args.pancan_factor)*(len(mt[i] & mt[j])>0)) * mv[i]*mv[j]          ## product
-                            Mmv.append(mrow)
+#                        for i in range(len(mi)):
+#                            mrow = np.zeros(len(mi), np.float64)
+#                            for j in range(len(mi)):
+#                                #mrow[j] = np.sqrt(mv[i]*mv[j])  ## geometric mean; actually does not perform better in most cases
+#                                if args.pancan_factor == 1.0:
+#                                    mrow[j] = mv[i]*mv[j]
+#                                else:
+#                                    mrow[j] = (args.pancan_factor + (1.0-args.pancan_factor)*(len(mt[i] & mt[j])>0)) * mv[i]*mv[j]          ## product
+#                            Mmv.append(mrow)
 
                         # Compute WAP score
-                        wap_obs = wap(mi, mvcorr, Mmv, DDt)
+                        #wap_obs = wap(mi, mvcorr, Mmv, DDt)
+                        wap_obs = fwap(mi, mv, DDt2)
 
                         # Create Null Sampler
                         rnd = 0
@@ -329,7 +348,7 @@ def main():
                             # test sampler
                             _ = sam.sample(mireal)
                         except:
-                            print("Error initializing {} for {} {} {}.".format(args.sampler, u1, u2, pdbch))
+                            print("Error initializing {} for {} {} {}.".format(args.sampler, u1, u2, pdbch), file = sys.stderr)
                             continue
 
                         STARTTIME=time.time()
@@ -364,8 +383,9 @@ def main():
                                     ## some samplers will fail to yield a sample in some (small number of) of runs due to combinatorics
                                     x = sam.sample(mireal)
 
-                                mi,mvcorr = x
-                                r = wap(mi, mvcorr, Mmv, DDt)
+                                mi_perm, mut_perm_idx = x
+                                #r = wap(mi, mvcorr, Mmv, DDt)
+                                r = fwap(mi_perm, mv[mut_perm_idx], DDt2)
 
                                 for rr in range(len(args.xpo)):
                                     wap_rnd[rr] += r[rr]
