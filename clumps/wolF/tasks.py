@@ -201,3 +201,77 @@ def clumps_workflow(
         "pdb_dir" : localization["pdb_dir"]
       }
     )
+
+def clumps_workflow_localize_maf_only(
+    maf,
+    sampler,
+    #stuff below this line stays on a ref disk, to prevent rebuilding
+    genome_2bit = "rodisk://canine-c0820e9f17cde673ca995479dc35c9ae/genome_2bit/hg19.2bit",
+    fasta = "rodisk://canine-c0820e9f17cde673ca995479dc35c9ae/fasta/UP000005640_9606.fasta.gz",
+    gpmaps = "rodisk://canine-c0820e9f17cde673ca995479dc35c9ae/gpmaps/genomeProteomeMaps.txt",
+    prot2pdb_chunks = "rodisk://canine-c0820e9f17cde673ca995479dc35c9ae/prot2pdb_chunks/huniprot2pdb.run18_chunks/",
+    pdb_dir = "rodisk://canine-c0820e9f17cde673ca995479dc35c9ae/pdb_dir/pdb/",
+    coverage_track = "rodisk://canine-c0820e9f17cde673ca995479dc35c9ae/coverage_track/WEx_cov.fwb",
+    coverage_index = "rodisk://canine-c0820e9f17cde673ca995479dc35c9ae/coverage_index/WEx_cov.fwi",
+    cancer_genes = "rodisk://canine-c0820e9f17cde673ca995479dc35c9ae/cancer_genes/allCancerGenes.txt",
+    uniprot_map = "rodisk://canine-c0820e9f17cde673ca995479dc35c9ae/uniprot_map/huniprot2pdb.run18.filt.txt",
+    permutations = 100,
+    threads = 8,
+    pancan_factor =1,
+    hillexp = 4
+):
+    # localization task
+    localization = wolf.LocalizeToDisk(
+      files = {
+        "maf" : maf
+      }
+    )
+
+    # map genome to proteome
+    clumps_prep = clumps_prep_task(
+      inputs = {
+        "maf" : localization["maf"],
+        "genome_2bit" : genome_2bit,
+        "fasta" : fasta,
+        "gpmaps" : gpmaps
+      }
+    )
+
+    # list chunks to define scatter
+    # (since we can't natively scatter against a directory)
+    chunk_list = wolf.Task(
+      name = "list_chunks",
+      inputs = { "chunks" : prot2pdb_chunks },
+      overrides = { "chunks" : "string" },
+      script = "gsutil ls ${chunks} > chunks.txt",
+      outputs = { "chunks" : ("chunks.txt", wolf.read_lines) }
+    )
+
+    # run clumps on each shard
+    clumps_run = clumps_run_task(
+      inputs = {
+        "clumps_preprocess" : clumps_prep["prep_outdir"],
+        "prot2pdb_chunks" : chunk_list["chunks"],
+        "pdb_dir" : pdb_dir,
+        "coverage_track" : coverage_track,
+        "coverage_track_index" : coverage_index,
+        "genome_2bit" : genome_2bit,
+        "fasta" : fasta,
+        "gpmaps" : gpmaps,
+        "sampler" : sampler,
+        "max_perms" : permutations,
+        "pancan_factor" : pancan_factor,
+        "hillexp" : hillexp,
+        "threads" : threads
+      }
+    )
+
+    clumps_postprocess = clumps_postprocess_task(
+      inputs = {
+        "clumps_preprocess" : prep_outdir,
+        "clumps_results" : [run_outdir],
+        "cancer_genes" : cancer_genes,
+        "uniprot_map" : uniprot_map,
+        "pdb_dir" : pdb_dir
+      }
+    )
