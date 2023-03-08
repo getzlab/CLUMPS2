@@ -250,6 +250,9 @@ def main():
 
         with gzip.open(args.maps, 'r') as f:
             for idx,line in tqdm(enumerate(f), desc=args.maps.split('/')[-1].split('.')[0]):
+                #splits each line of the huniprot mapping file
+                #uniprotid1, uniprotid2, pdb structure (includes chain), residue map
+                #for alphafold, u1 and u2 should always be same, alist should always be '-', pdb structure may need to be spoofed, resmap???
                 u1,u2,pdbch,alist,resmap = line.decode('utf-8').strip('\n').split('\t', 4)
 
                 if os.path.isfile(os.path.join(args.muts, u1)):
@@ -257,7 +260,11 @@ def main():
                     # TODO
                     #
                     pdbch = pdbch.split('-')
-                    ur,pr,_ = parse_resmap(resmap)
+
+                    #splits res map into two lists of number, and a dict of numbers and booleans
+                    #number: boolean dict represents when numbers are identical...?
+                    ur,pr,prd = parse_resmap(resmap)
+
 
                     if len(ur) < 5:
                         print("Bad mapping for {}.".format(ur), file = sys.stderr)
