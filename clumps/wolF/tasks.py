@@ -209,7 +209,7 @@ def clumps_workflow_localize_maf_only(
     genome_2bit = "rodisk://canine-c0820e9f17cde673ca995479dc35c9ae/genome_2bit/hg19.2bit",
     fasta = "rodisk://canine-c0820e9f17cde673ca995479dc35c9ae/fasta/UP000005640_9606.fasta.gz",
     gpmaps = "rodisk://canine-c0820e9f17cde673ca995479dc35c9ae/gpmaps/genomeProteomeMaps.txt",
-    prot2pdb_chunks = "rodisk://canine-c0820e9f17cde673ca995479dc35c9ae/prot2pdb_chunks/huniprot2pdb.run18_chunks/",
+    prot2pdb_chunks = 'gs://sa-clumps2-ref/dat/huniprot/huniprot2pdb.run18_chunks/',#"/mnt/nfs/ro_disks/canine-c0820e9f17cde673ca995479dc35c9ae/prot2pdb_chunks/huniprot2pdb.run18_chunks/",
     pdb_dir = "rodisk://canine-c0820e9f17cde673ca995479dc35c9ae/pdb_dir/pdb/",
     coverage_track = "rodisk://canine-c0820e9f17cde673ca995479dc35c9ae/coverage_track/WEx_cov.fwb",
     coverage_index = "rodisk://canine-c0820e9f17cde673ca995479dc35c9ae/coverage_index/WEx_cov.fwi",
@@ -268,8 +268,8 @@ def clumps_workflow_localize_maf_only(
 
     clumps_postprocess = clumps_postprocess_task(
       inputs = {
-        "clumps_preprocess" : prep_outdir,
-        "clumps_results" : [run_outdir],
+        "clumps_preprocess" : clumps_prep['prep_outdir'],
+        "clumps_results" : clumps_run['run_outdir'],
         "cancer_genes" : cancer_genes,
         "uniprot_map" : uniprot_map,
         "pdb_dir" : pdb_dir
