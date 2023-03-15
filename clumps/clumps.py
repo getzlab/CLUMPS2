@@ -323,6 +323,7 @@ def main():
 
                         # Compute WAP score
                         #wap_obs = wap(mi, mvcorr, Mmv, DDt)
+
                         wap_obs = fwap(mi, mv, DDt2)
 
                         # Create Null Sampler
@@ -374,6 +375,9 @@ def main():
 
                             exitstatus=0  ## 0 means terminated OK, 1 means it had to abort due to timeout
                             while rnd < args.max_rand/args.threads and (rnd%1000 or booster()):  ## booster is applied once per 1000 randomizations
+                                
+                                #time limit often gets hit when large structures are run.  I think it may have been optimized to allow very large structures to be run after on larger nodes.
+                                #Is there a practical way to sort genes by predicted permutation time and given more resources?
                                 if not rnd%1000 and (time.time()-STARTTIME)/7200.0 > 1:
                                     exitstatus=1
                                     break
