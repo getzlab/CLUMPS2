@@ -7,7 +7,7 @@ from clumps.wolF.tasks import clumps_workflow_localize_maf_only
 import wolf
 from datetime import datetime
 
-maf = 'MC3-14k-merge_v1.50_genes.variant_classification.maf'
+maf = 'gs://sa-clumps2-ref/af_ajd/MC3_MAF/MC3-14k-merge_v1.50_genes.variant_classification.maf'
 sampler = 'MutspecCoverageSampler'
 run_name = 'run_clumps_50_genes_MC3_10000000_perms_v2_retry'
 

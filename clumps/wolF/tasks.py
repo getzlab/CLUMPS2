@@ -8,7 +8,12 @@ import subprocess
 #tasks.py
 #v55 most recent
 #speed_v63
+
+#this is the most up to date docker, including speedup
 CLUMPS_DOCKER_IMAGE = "gcr.io/broad-getzlab-workflows/clumps:speed_af_v70"
+
+#In this one the speedup code is commented out, as it is not comaptible with the pancan factor code
+#CLUMPS_DOCKER_IMAGE = 'gcr.io/broad-getzlab-workflows/clumps:no_speed_pancan_uncommented_71'
 
 class clumps_prep_task(wolf.Task):
     # Preparation for clumps input files:
