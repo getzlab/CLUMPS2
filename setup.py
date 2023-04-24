@@ -5,6 +5,7 @@ setup(
     author='Shankara Anand',
     author_email='sanand@broadinstitute.org',
     description='CLUMPS driver gene discovery using 3D protein structure (Getz Lab).',
+    py_modules=[], 
     install_requires=[
         "twobitreader>=3.1.7",
         "statsmodels>=0.9.0",
