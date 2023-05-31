@@ -122,3 +122,10 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+
+
+
+#specific python scripts
+clumps/vis/createPymolSession_old.py
+clumps/vis/mol.py
