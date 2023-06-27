@@ -378,9 +378,9 @@ def main():
                                 
                                 #time limit often gets hit when large structures are run.  I think it may have been optimized to allow very large structures to be run after on larger nodes.
                                 #Is there a practical way to sort genes by predicted permutation time and given more resources?
-                                if not rnd%1000 and (time.time()-STARTTIME)/7200.0 > 1:
-                                    exitstatus=1
-                                    break
+                                #if not rnd%1000 and (time.time()-STARTTIME)/7200.0 > 1:
+                                #    exitstatus=1
+                                #    break
 
                                 x = None
                                 while x is None:

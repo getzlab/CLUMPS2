@@ -8,7 +8,7 @@ import subprocess
 #tasks.py
 #v55 most recent
 #speed_v63
-CLUMPS_DOCKER_IMAGE = "gcr.io/broad-getzlab-workflows/clumps:speed_af_v70"
+CLUMPS_DOCKER_IMAGE = "gcr.io/broad-getzlab-workflows/clumps:no_timeout_71"
 
 class clumps_prep_task(wolf.Task):
     # Preparation for clumps input files:
@@ -37,8 +37,8 @@ class clumps_prep_task(wolf.Task):
 
 class clumps_run_task(wolf.Task):
     # this task is the main clumps processing/algorithm
-    resources = { "mem" : "8G" }
-    conf = {"clust_frac": 0.99}
+    resources = { "partition" : "n1-highcpu-64-nonp", "cpus-per-task" : 64, "mem": "50200M" }
+    conf = {"clust_frac": 1}
     # the input files for this step are the different individual prot2pdb chunks from the huniprot2pdb_chunks folder
     # provide a list of all the individual prot2pdb chunks (or the file path to each prot2pdb chunks file)
     
@@ -55,14 +55,15 @@ class clumps_run_task(wolf.Task):
         "fasta" : None,
         "gpmaps" : None,
         "sampler" : "UniformSampler",
-        "max_perms" : 300000,
-        "threads" : 16,
+        "max_perms" : 100000,
+        "threads" : 64,
         "pancan_factor" : 1,
         "hillexp" : 4
     }
 
     overrides = { "prot2pdb_chunks" : "delayed" }
 
+    
     script = """    
     clumps --muts ${clumps_preprocess}/split_proteins \
         --maps ${prot2pdb_chunks} \
@@ -78,8 +79,6 @@ class clumps_run_task(wolf.Task):
         --max_rand ${max_perms} \
         --threads ${threads}
     """
-
-    resources = { "cpus-per-task" : 16 }
 
     output_patterns = {
         "run_outdir" : "clumps_results"
