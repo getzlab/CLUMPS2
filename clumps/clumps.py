@@ -298,7 +298,7 @@ def main():
                     if len(mi) > 0:
                         try:
                             D,x,pdb_resnames = get_distance_matrix(pdbch, args.pdb_dir, pdb_resids=pr)
-                            #DDt = transform_distance_matrix(D, ur, args.xpo)
+                            DDt = transform_distance_matrix(D, ur, args.xpo)
                             DDt2 = np.tril(transform_distance_matrix2(D, args.xpo), -1)
                         except:
                             print("Unable to load PDB...", file = sys.stderr)
@@ -308,23 +308,23 @@ def main():
 
                         # Compute matrix
                         ## matrix that holds mv[i]*mv[j] values (sqrt or not)
-                        #Mmv = []
-                        #mvcorr = range(len(mv))
+                        Mmv = []
+                        mvcorr = range(len(mv))
 
-#                        for i in range(len(mi)):
-#                            mrow = np.zeros(len(mi), np.float64)
-#                            for j in range(len(mi)):
-#                                #mrow[j] = np.sqrt(mv[i]*mv[j])  ## geometric mean; actually does not perform better in most cases
-#                                if args.pancan_factor == 1.0:
-#                                    mrow[j] = mv[i]*mv[j]
-#                                else:
-#                                    mrow[j] = (args.pancan_factor + (1.0-args.pancan_factor)*(len(mt[i] & mt[j])>0)) * mv[i]*mv[j]          ## product
-#                            Mmv.append(mrow)
+                        for i in range(len(mi)):
+                            mrow = np.zeros(len(mi), np.float64)
+                            for j in range(len(mi)):
+                                #mrow[j] = np.sqrt(mv[i]*mv[j])  ## geometric mean; actually does not perform better in most cases
+                                if args.pancan_factor == 1.0:
+                                    mrow[j] = mv[i]*mv[j]
+                                else:
+                                    mrow[j] = (args.pancan_factor + (1.0-args.pancan_factor)*(len(mt[i] & mt[j])>0)) * mv[i]*mv[j]          ## product
+                            Mmv.append(mrow)
 
                         # Compute WAP score
-                        #wap_obs = wap(mi, mvcorr, Mmv, DDt)
+                        wap_obs = wap(mi, mvcorr, Mmv, DDt)
 
-                        wap_obs = fwap(mi, mv, DDt2)
+                        #wap_obs = fwap(mi, mv, DDt2)
 
                         # Create Null Sampler
                         rnd = 0

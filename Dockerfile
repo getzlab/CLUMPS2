@@ -19,5 +19,9 @@ RUN pip install twobitreader statsmodels scipy pyopenssl prody mkl-random mkl-ff
 COPY . /build
 RUN python3 -m pip install -e .
 
+#add ipdb for easier debugging
+RUN pip install ipdb
+RUN export PYTHONBREAKPOINT=ipdb.set_trace
+
 # Test
 RUN clumps -h

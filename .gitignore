@@ -129,3 +129,12 @@ dmypy.json
 #specific python scripts
 clumps/vis/createPymolSession_old.py
 clumps/vis/mol.py
+
+
+analysis/run_clumps*
+analysis/uniprot_chunks
+*maf
+*log
+*~
+*tsv
+*txt

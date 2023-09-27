@@ -8,7 +8,9 @@ import subprocess
 #tasks.py
 #v55 most recent
 #speed_v63
-CLUMPS_DOCKER_IMAGE = "gcr.io/broad-getzlab-workflows/clumps:no_timeout_71"
+#CLUMPS_DOCKER_IMAGE = "gcr.io/broad-getzlab-workflows/clumps:pancan_restore_72"
+CLUMPS_DOCKER_IMAGE = "gcr.io/broad-getzlab-workflows/clumps::no_timeout_71"
+
 
 class clumps_prep_task(wolf.Task):
     # Preparation for clumps input files:
@@ -37,7 +39,7 @@ class clumps_prep_task(wolf.Task):
 
 class clumps_run_task(wolf.Task):
     # this task is the main clumps processing/algorithm
-    resources = { "partition" : "n1-highcpu-64-nonp", "cpus-per-task" : 64, "mem": "50200M" }
+    resources = { "cpus-per-task" : 16 } #"partition" : "n1-highcpu-64-nonp", "cpus-per-task" : 64, "mem": "50200M" }
     conf = {"clust_frac": 1}
     # the input files for this step are the different individual prot2pdb chunks from the huniprot2pdb_chunks folder
     # provide a list of all the individual prot2pdb chunks (or the file path to each prot2pdb chunks file)
@@ -74,6 +76,7 @@ class clumps_run_task(wolf.Task):
         --mut_spectra ${clumps_preprocess}/mut_spectra.txt \
         --pdb_dir ${pdb_dir} \
         --hgfile ${genome_2bit} --fasta ${fasta} --gpmaps ${gpmaps} \
+
         --hill_exp ${hillexp} \
         --pancan_factor ${pancan_factor} \
         --max_rand ${max_perms} \
