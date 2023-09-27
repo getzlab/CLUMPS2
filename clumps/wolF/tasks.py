@@ -9,7 +9,7 @@ import subprocess
 #v55 most recent
 #speed_v63
 #CLUMPS_DOCKER_IMAGE = "gcr.io/broad-getzlab-workflows/clumps:pancan_restore_72"
-CLUMPS_DOCKER_IMAGE = "gcr.io/broad-getzlab-workflows/clumps::no_timeout_71"
+CLUMPS_DOCKER_IMAGE = "gcr.io/broad-getzlab-workflows/clumps:no_timeout_71"
 
 
 class clumps_prep_task(wolf.Task):
