@@ -204,28 +204,36 @@ def clumps_workflow(
       }
     )
 
-def clumps_workflow_localize_maf_only(
+def clumps_workflow_dont_localize_maf( #for when MAF is small, only localize big files
     maf,
     sampler,
     #stuff below this line stays on a ref disk, to prevent rebuilding
-    genome_2bit = "rodisk://canine-c0820e9f17cde673ca995479dc35c9ae/genome_2bit/hg19.2bit",
-    fasta = "rodisk://canine-c0820e9f17cde673ca995479dc35c9ae/fasta/UP000005640_9606.fasta.gz",
-    gpmaps = "rodisk://canine-c0820e9f17cde673ca995479dc35c9ae/gpmaps/genomeProteomeMaps.txt",
-    prot2pdb_chunks = 'gs://sa-clumps2-ref/dat/huniprot/huniprot2pdb.run18_chunks/',#"/mnt/nfs/ro_disks/canine-c0820e9f17cde673ca995479dc35c9ae/prot2pdb_chunks/huniprot2pdb.run18_chunks/",
-    pdb_dir = "rodisk://canine-c0820e9f17cde673ca995479dc35c9ae/pdb_dir/pdb",
-    coverage_track = "rodisk://canine-c0820e9f17cde673ca995479dc35c9ae/coverage_track/WEx_cov.fwb",
-    coverage_index = "rodisk://canine-c0820e9f17cde673ca995479dc35c9ae/coverage_index/WEx_cov.fwi",
-    cancer_genes = "rodisk://canine-c0820e9f17cde673ca995479dc35c9ae/cancer_genes/allCancerGenes.txt",
-    uniprot_map = "rodisk://canine-c0820e9f17cde673ca995479dc35c9ae/uniprot_map/huniprot2pdb.run18.filt.txt",
-    permutations = 100,
-    threads = 8,
+    genome_2bit="gs://sa-clumps2-ref/dat/hg19.2bit",
+    fasta="gs://sa-clumps2-ref/dat/UP000005640_9606.fasta.gz",
+    gpmaps="gs://sa-clumps2-ref/dat/genomeProteomeMaps.txt",
+    prot2pdb_chunks="gs://sa-clumps2-ref/dat/huniprot/huniprot2pdb.run18_chunks/",
+    pdb_dir="gs://sa-clumps2-ref/dat/pdbs/ftp.wwpdb.org/pub/pdb/data/structures/divided/pdb",
+    coverage_track="gs://sa-clumps2-ref/dat/cov/WEx_cov.fwb",
+    coverage_index="gs://sa-clumps2-ref/dat/cov/WEx_cov.fwi",
+    cancer_genes="gs://sa-clumps2-ref/dat/allCancerGenes.txt",
+    uniprot_map="gs://sa-clumps2-ref/dat/huniprot/huniprot2pdb.run18.filt.txt",
+    permutations = 10000,
+    threads = 16,
     pancan_factor =1,
-    hillexp = 4
+    hillexp = 3
 ):
     # localization task
     localization = wolf.LocalizeToDisk(
       files = {
-        "maf" : maf
+        "genome_2bit" : genome_2bit,
+        "fasta" : fasta,
+        "gpmaps" : gpmaps,
+        "prot2pdb_chunks" : prot2pdb_chunks, # XXX: do we need this on the RODISK? we are scattering directly from the bucket
+        "pdb_dir" : pdb_dir,
+        "coverage_track" : coverage_track,
+        "coverage_index" : coverage_index,
+        "cancer_genes" : cancer_genes,
+        "uniprot_map" : uniprot_map
       }
     )
 
