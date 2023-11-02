@@ -228,7 +228,7 @@ def clumps_workflow_dont_localize_maf( #for when MAF is small, only localize big
         "genome_2bit" : genome_2bit,
         "fasta" : fasta,
         "gpmaps" : gpmaps,
-        "prot2pdb_chunks" : prot2pdb_chunks, # XXX: do we need this on the RODISK? we are scattering directly from the bucket
+        #"prot2pdb_chunks" : prot2pdb_chunks, # XXX: do we need this on the RODISK? we are scattering directly from the bucket
         "pdb_dir" : pdb_dir,
         "coverage_track" : coverage_track,
         "coverage_index" : coverage_index,
