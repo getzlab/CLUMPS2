@@ -222,28 +222,33 @@ def clumps_workflow_dont_localize_maf( #for when MAF is small, only localize big
     pancan_factor =1,
     hillexp = 3
 ):
-    # localization task
-    localization = wolf.LocalizeToDisk(
+    # gp localization task, kept separate because gpmaps was not localized by oldclumps
+    gp_localization = wolf.LocalizeToDisk(
       files = {
-        "genome_2bit" : genome_2bit,
-        "fasta" : fasta,
-        "gpmaps" : gpmaps,
-        #"prot2pdb_chunks" : prot2pdb_chunks, # XXX: do we need this on the RODISK? we are scattering directly from the bucket
-        "pdb_dir" : pdb_dir,
-        "coverage_track" : coverage_track,
-        "coverage_index" : coverage_index,
-        "cancer_genes" : cancer_genes,
-        "uniprot_map" : uniprot_map
+        "gpmaps" : gpmaps
+
       }
     )
-
+    # localization task, should generate same ref disks as oldclumps
+    localization= wolf.LocalizeToDisk(
+        files={
+            'genome_2bit': genome_2bit,
+            'fasta': fasta,
+            'pdb_dir': pdb_dir,
+            'coverage_track': coverage_track,
+            'coverage_track_index': coverage_index,
+            'cancer_genes': cancer_genes,
+            'uniprot_map': uniprot_map
+        }
+    )
+    # map genome to proteome
     # map genome to proteome
     clumps_prep = clumps_prep_task(
       inputs = {
-        "maf" : localization["maf"],
-        "genome_2bit" : genome_2bit,
-        "fasta" : fasta,
-        "gpmaps" : gpmaps
+        "maf" : maf,
+        "genome_2bit" : localization["genome_2bit"],
+        "fasta" : localization["fasta"],
+        "gpmaps" : localization["gpmaps"]
       }
     )
 
@@ -262,12 +267,12 @@ def clumps_workflow_dont_localize_maf( #for when MAF is small, only localize big
       inputs = {
         "clumps_preprocess" : clumps_prep["prep_outdir"],
         "prot2pdb_chunks" : chunk_list["chunks"],
-        "pdb_dir" : pdb_dir,
-        "coverage_track" : coverage_track,
-        "coverage_track_index" : coverage_index,
-        "genome_2bit" : genome_2bit,
-        "fasta" : fasta,
-        "gpmaps" : gpmaps,
+        "pdb_dir" : localization["pdb_dir"],
+        "coverage_track" : localization["coverage_track"],
+        "coverage_track_index" : localization["coverage_index"],
+        "genome_2bit" : localization["genome_2bit"],
+        "fasta" : localization["fasta"],
+        "gpmaps" : localization["gpmaps"],
         "sampler" : sampler,
         "max_perms" : permutations,
         "pancan_factor" : pancan_factor,
@@ -278,10 +283,10 @@ def clumps_workflow_dont_localize_maf( #for when MAF is small, only localize big
 
     clumps_postprocess = clumps_postprocess_task(
       inputs = {
-        "clumps_preprocess" : clumps_prep['prep_outdir'],
-        "clumps_results" : [clumps_run['run_outdir']],
-        "cancer_genes" : cancer_genes,
-        "uniprot_map" : uniprot_map,
-        "pdb_dir" : pdb_dir
+        "clumps_preprocess" : clumps_prep["prep_outdir"],
+        "clumps_results" : [clumps_run["run_outdir"]],
+        "cancer_genes" : localization["cancer_genes"],
+        "uniprot_map" : localization["uniprot_map"],
+        "pdb_dir" : localization["pdb_dir"]
       }
     )
