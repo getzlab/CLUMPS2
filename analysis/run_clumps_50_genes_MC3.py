@@ -9,7 +9,7 @@ from datetime import datetime
 
 maf = 'gs://sa-clumps2-ref/af_ajd/MC3_MAF/MC3-14k-merge_v1.50_genes.variant_classification.maf'
 sampler = 'MutspecCoverageSampler'
-run_name = 'run_clumps_50_genes_MC3_10000000_perms_v2_retry'
+run_name = 'run_clumps_50_genes_MC3_10000000_perms_v2_retry_recap'
 
 
 wolf.utils.set_log_path('./%s_%s.log' % (run_name,datetime.today()))
